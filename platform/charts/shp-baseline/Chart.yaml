@@ -1,0 +1,5 @@
+apiVersion: v2
+name: shp-baseline
+description: Nền của mỗi cụm — namespace PSA restricted, NetworkPolicy default-deny, policy Kyverno, Gateway + TLS (GOP-05, GOP-07, GOP-08)
+type: application
+version: 0.1.0

@@ -1,0 +1,5 @@
+# Envoy Gateway (Gateway API). GatewayClass/Gateway/TLS khai báo ở shp-baseline (GOP-05).
+deployment:
+  replicas: 2
+  envoyGateway:
+    resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }

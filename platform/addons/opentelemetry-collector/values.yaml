@@ -1,0 +1,26 @@
+# Nhận OTLP từ mọi service (SHP_OTLP_EXPORT=true), xuất sang Azure Monitor (GOP-06).
+# Connection string Application Insights: Secret `appinsights` do ENV-01 tạo từ Key Vault — không nằm trong repo.
+mode: deployment
+replicaCount: 2
+image: { repository: otel/opentelemetry-collector-contrib }
+resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 512Mi } }
+extraEnvs:
+  - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+    valueFrom: { secretKeyRef: { name: appinsights, key: connection-string, optional: true } }
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc: { endpoint: "0.0.0.0:4317" }
+        http: { endpoint: "0.0.0.0:4318" }
+  processors:
+    memory_limiter: { check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 20 }
+    batch: {}
+  exporters:
+    azuremonitor:
+      connection_string: ${env:APPLICATIONINSIGHTS_CONNECTION_STRING}
+  service:
+    pipelines:
+      traces: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [azuremonitor] }
+      metrics: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [azuremonitor] }
+      logs: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [azuremonitor] }

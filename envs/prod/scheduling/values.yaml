@@ -1,0 +1,10 @@
+# Values của scheduling ở prod. image.digest do pipeline svc-scheduling (gitops-promote) ghi — KHÔNG sửa tay.
+# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+image:
+  repository: ""            # <acrLoginServer>/scheduling — điền cùng lúc với envs/prod/platform.yaml
+  digest: ""
+env:
+  OTEL_SERVICE_NAME: scheduling
+resources:
+  requests: { cpu: 100m, memory: 384Mi }
+  limits: { memory: 768Mi }   # JVM: -XX:MaxRAMPercentage=75

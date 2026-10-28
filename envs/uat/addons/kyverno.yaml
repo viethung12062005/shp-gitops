@@ -1,0 +1,1 @@
+admissionController: { replicas: 1 }   # uat nhỏ: 1 replica đủ

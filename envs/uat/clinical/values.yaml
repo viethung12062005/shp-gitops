@@ -1,0 +1,10 @@
+# Values của clinical ở uat. image.digest do pipeline svc-clinical (gitops-promote) ghi — KHÔNG sửa tay.
+# Application chỉ được tạo khi digest khác rỗng (clusters/uat/services.yaml).
+image:
+  repository: ""            # <acrLoginServer>/clinical — điền cùng lúc với envs/uat/platform.yaml
+  digest: ""
+env:
+  OTEL_SERVICE_NAME: clinical
+resources:
+  requests: { cpu: 100m, memory: 384Mi }
+  limits: { memory: 768Mi }   # JVM: -XX:MaxRAMPercentage=75

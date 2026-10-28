@@ -1,0 +1,8 @@
+# Values chung cho mọi service trong cụm uat. ĐIỀN các ô trống trước khi dựng (không phải secret).
+env:
+  OIDC_AUTHORITY: ""        # Entra ID: https://login.microsoftonline.com/<tenant-id>/v2.0
+  OIDC_AUDIENCE: ""         # Application ID URI của API, vd. api://shp-api-uat
+  SHP_REQUIRE_MFA_FOR_STAFF: "true"
+replicaCount: 1
+pdb:
+  enabled: false

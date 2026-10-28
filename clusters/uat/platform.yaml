@@ -1,0 +1,69 @@
+# Add-on nền tảng (GOP-04..07), ghim version chart. Values: platform/addons/<tên>/values.yaml, ghi đè theo môi trường ở
+# envs/uat/addons/<tên>.yaml (không bắt buộc). Nâng version: sửa ở đây cho uat trước, prod sau.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - { name: cert-manager, repoURL: "https://charts.jetstack.io", chart: cert-manager, version: "v1.21.2", namespace: cert-manager, wave: "-3" }
+          - { name: kyverno, repoURL: "https://kyverno.github.io/kyverno", chart: kyverno, version: "3.9.1", namespace: kyverno, wave: "-3" }
+          - { name: argo-rollouts, repoURL: "https://argoproj.github.io/argo-helm", chart: argo-rollouts, version: "2.43.7", namespace: argo-rollouts, wave: "-3" }
+          - { name: keda, repoURL: "https://kedacore.github.io/charts", chart: keda, version: "2.20.2", namespace: keda, wave: "-3" }
+          - { name: envoy-gateway, repoURL: "docker.io/envoyproxy", chart: gateway-helm, version: "1.9.3", namespace: envoy-gateway-system, wave: "-3" }
+          - { name: opentelemetry-collector, repoURL: "https://open-telemetry.github.io/opentelemetry-helm-charts", chart: opentelemetry-collector, version: "0.177.0", namespace: observability, wave: "-3" }
+  template:
+    metadata:
+      name: "{{ .name }}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{ .wave }}"
+    spec:
+      project: platform
+      sources:
+        - repoURL: "{{ .repoURL }}"
+          chart: "{{ .chart }}"
+          targetRevision: "{{ .version }}"
+          helm:
+            releaseName: "{{ .name }}"
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/platform/addons/{{ .name }}/values.yaml
+              - $values/envs/uat/addons/{{ .name }}.yaml
+        - repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+          targetRevision: main
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]
+        retry: { limit: 5, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }
+---
+# Nền của cụm: namespace (PSA restricted), NetworkPolicy default-deny, policy Kyverno, Gateway + TLS. Chart nội bộ, chạy sau add-on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shp-baseline
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+    targetRevision: main
+    path: platform/charts/shp-baseline
+    helm:
+      valueFiles: [../../../envs/uat/platform.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shp-apps
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # chờ CRD của add-on sẵn sàng

@@ -1,0 +1,46 @@
+# Một Application cho mỗi service có envs/prod/<service>/values.yaml VÀ đã có image.digest (pipeline gitops-promote ghi).
+# Service chưa promote lần nào (digest rỗng) không được tạo Application — chart microservice từ chối render khi thiếu digest.
+# Không dùng goTemplate để post-selector lọc được theo khóa phẳng `image.digest`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: services
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+        revision: main
+        files:
+          - path: envs/prod/*/values.yaml
+      selector:
+        matchExpressions:
+          - { key: image.digest, operator: NotIn, values: [""] }
+  template:
+    metadata:
+      name: "{{path.basename}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: shp-apps
+      sources:
+        - repoURL: https://github.com/viethung12062005/shp-platform-templates-scratch.git
+          targetRevision: work/initial-baseline   # TODO CIT-09: ghim tag chart-v0.1.0 khi phát hành chart
+          path: charts/microservice
+          helm:
+            releaseName: "{{path.basename}}"
+            valueFiles:
+              - $values/envs/services-common.yaml
+              - $values/envs/prod/services.yaml
+              - $values/envs/prod/{{path.basename}}/values.yaml
+            parameters:
+              - { name: fullnameOverride, value: "{{path.basename}}" }
+        - repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+          targetRevision: main
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: shp-apps
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        retry: { limit: 3, backoff: { duration: 20s, factor: 2, maxDuration: 3m } }

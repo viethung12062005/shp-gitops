@@ -1,0 +1,81 @@
+{{- $ns := .Values.appsNamespace -}}
+{{- $p := .Values.policies -}}
+{{- if not .Values.acrLoginServer }}{{ fail "acrLoginServer là bắt buộc (envs/<env>/platform.yaml)" }}{{ end }}
+# GOP-07: chỉ image từ ACR, đã ký bởi pipeline; cấm :latest; bắt buộc resources và probe. Chỉ áp dụng cho namespace ứng dụng.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: shp-restrict-registry
+  annotations: { policies.kyverno.io/title: "Chỉ image từ ACR của dự án" }
+spec:
+  validationFailureAction: {{ $p.action }}
+  background: true
+  rules:
+    - name: only-acr
+      match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
+      validate:
+        message: "Image phải đến từ {{ .Values.acrLoginServer }}"
+        pattern:
+          spec:
+            =(initContainers): [ { image: "{{ .Values.acrLoginServer }}/*" } ]
+            containers: [ { image: "{{ .Values.acrLoginServer }}/*" } ]
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: shp-verify-signature
+  annotations: { policies.kyverno.io/title: "Image phải được ký bởi pipeline (cosign keyless)" }
+spec:
+  validationFailureAction: {{ $p.action }}
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: cosign-keyless
+      match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
+      verifyImages:
+        - imageReferences: ["{{ .Values.acrLoginServer }}/*"]
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    subject: "{{ $p.signerSubject }}"
+                    issuer: "{{ $p.signerIssuer }}"
+                    rekor: { url: https://rekor.sigstore.dev }
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: shp-disallow-latest
+spec:
+  validationFailureAction: {{ $p.action }}
+  background: true
+  rules:
+    - name: no-latest-tag
+      match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
+      validate:
+        message: "Không dùng tag :latest; deploy theo digest"
+        pattern:
+          spec:
+            containers: [ { image: "!*:latest" } ]
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: shp-require-resources-probes
+spec:
+  validationFailureAction: {{ $p.action }}
+  background: true
+  rules:
+    - name: resources-and-probes
+      match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
+      validate:
+        message: "Container phải có requests cpu/memory, limit memory, readinessProbe và livenessProbe"
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests: { cpu: "?*", memory: "?*" }
+                  limits: { memory: "?*" }
+                readinessProbe: { httpGet: { path: "?*" } }
+                livenessProbe: { httpGet: { path: "?*" } }

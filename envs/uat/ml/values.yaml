@@ -1,0 +1,7 @@
+# Values của ml ở uat. image.digest do pipeline svc-ml (gitops-promote) ghi — KHÔNG sửa tay.
+# Application chỉ được tạo khi digest khác rỗng (clusters/uat/services.yaml).
+image:
+  repository: ""            # <acrLoginServer>/ml — điền cùng lúc với envs/uat/platform.yaml
+  digest: ""
+env:
+  OTEL_SERVICE_NAME: ml
