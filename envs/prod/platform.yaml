@@ -1,0 +1,7 @@
+# Values của chart nền platform/charts/shp-baseline cho cụm prod.
+# ĐIỀN trước khi dựng môi trường (không phải secret; lấy từ output Terraform): tools/validate.sh báo lỗi nếu còn trống khi chạy với --strict.
+acrLoginServer: ""          # output acr_login_server của shp-infra/bootstrap, vd. acrshpab12cd.azurecr.io
+gateway:
+  hostname: ""              # vd. api.prod.<tên miền>
+  acmeEmail: ""
+  acmeServer: https://acme-v02.api.letsencrypt.org/directory

@@ -1,0 +1,5 @@
+# Canary cho prod/ml (GOP-09, MLO-03); dashboard tắt (không mở UI ra ngoài).
+dashboard: { enabled: false }
+controller:
+  replicas: 2
+  resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }

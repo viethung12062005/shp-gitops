@@ -1,0 +1,11 @@
+# Values chung cho MỌI service ở MỌI môi trường (nạp trước envs/<env>/services.yaml và envs/<env>/<svc>/values.yaml).
+# Mặc định an toàn của chart giữ nguyên; ở đây chỉ thêm phần riêng của dự án.
+env:
+  SHP_OTLP_EXPORT: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector.observability:4318
+  SHP_CLINICAL_URL: http://clinical
+networkPolicy:
+  enabled: true
+  # Mặc định: chỉ nhận từ pod cùng namespace (gateway → service, gọi /internal giữa service).
+  ingressFrom:
+    - podSelector: {}

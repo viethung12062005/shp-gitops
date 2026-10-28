@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.appsNamespace }}
+  labels:
+    # Pod Security Admission mức restricted (NFR-SEC7, GOP-08)
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    shp.example.org/apps: "true"
+---
+# Mặc định chặn mọi luồng vào; mỗi service mở đúng nguồn được phép bằng networkPolicy.ingressFrom trong values của nó.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Values.appsNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]

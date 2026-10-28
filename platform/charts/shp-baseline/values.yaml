@@ -1,0 +1,15 @@
+# Ghi đè theo môi trường ở envs/<env>/platform.yaml.
+appsNamespace: shp-apps
+# Registry duy nhất được phép cho image của service, ví dụ acrshpab12cd.azurecr.io (output `acr_login_server` của bootstrap Terraform).
+acrLoginServer: ""
+policies:
+  # Enforce: chặn; Audit: chỉ ghi báo cáo. GOP-07 yêu cầu Enforce ở cả uat và prod.
+  action: Enforce
+  # Danh tính ký cosign keyless = reusable workflow container.yml của repo templates.
+  signerSubject: "https://github.com/viethung12062005/shp-platform-templates-scratch/.github/workflows/container.yml@*"
+  signerIssuer: https://token.actions.githubusercontent.com
+gateway:
+  enabled: true
+  hostname: ""              # vd. api.uat.<tên miền>; để trống thì Gateway chỉ có listener HTTP (chưa có TLS)
+  acmeEmail: ""             # email nhận thông báo Let's Encrypt (không phải dữ liệu bệnh nhân)
+  acmeServer: https://acme-staging-v02.api.letsencrypt.org/directory

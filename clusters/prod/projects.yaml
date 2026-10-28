@@ -1,0 +1,50 @@
+# Phân quyền Argo CD: add-on nền tảng và service ứng dụng tách project; service chỉ được deploy vào namespace shp-apps.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Add-on nền tảng của cụm prod (SA)
+  sourceRepos:
+    - https://github.com/viethung12062005/shp-gitops-scratch.git
+    - https://charts.jetstack.io
+    - https://kyverno.github.io/kyverno
+    - https://argoproj.github.io/argo-helm
+    - https://kedacore.github.io/charts
+    - docker.io/envoyproxy
+    - https://open-telemetry.github.io/opentelemetry-helm-charts
+  destinations:
+    - { server: https://kubernetes.default.svc, namespace: "*" }
+  clusterResourceWhitelist:
+    - { group: "*", kind: "*" }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: shp-apps
+  namespace: argocd
+spec:
+  description: 8 service ứng dụng của cụm prod
+  sourceRepos:
+    - https://github.com/viethung12062005/shp-gitops-scratch.git
+    - https://github.com/viethung12062005/shp-platform-templates-scratch.git
+  destinations:
+    - { server: https://kubernetes.default.svc, namespace: shp-apps }
+  clusterResourceWhitelist: []          # service không được tạo tài nguyên cấp cụm
+  namespaceResourceBlacklist:
+    - { group: "", kind: ResourceQuota }
+    - { group: "", kind: LimitRange }
+---
+# Khai báo registry OCI công khai của Envoy Gateway (không có credential nào).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-envoyproxy-oci
+  namespace: argocd
+  labels: { argocd.argoproj.io/secret-type: repository }
+stringData:
+  name: envoyproxy
+  type: helm
+  url: docker.io/envoyproxy
+  enableOCI: "true"

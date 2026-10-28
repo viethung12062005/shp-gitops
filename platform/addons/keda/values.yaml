@@ -1,0 +1,6 @@
+# KEDA: scale theo lịch/hàng đợi (PRD-11). Xác thực tới Service Bus bằng Workload Identity.
+podIdentity:
+  azureWorkload: { enabled: true }
+resources:
+  operator: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }
+  metricServer: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }

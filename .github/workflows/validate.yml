@@ -1,0 +1,34 @@
+# Kiểm tra mọi PR vào repo GitOps (kể cả PR promote của bot): YAML, render, kubeconform. Không deploy gì — Argo CD làm việc đó.
+name: validate
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: viethung12062005/shp-platform-templates-scratch
+          ref: work/initial-baseline   # TODO CIT-09: ghim tag chart-v0.1.0
+          path: templates
+      - name: Cài helm 3.18.6 + kubeconform 0.7.0 (kiểm checksum)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin" && cd "$(mktemp -d)"
+          curl -sSLO https://get.helm.sh/helm-v3.18.6-linux-amd64.tar.gz
+          curl -sSL https://get.helm.sh/helm-v3.18.6-linux-amd64.tar.gz.sha256sum | sha256sum -c -
+          tar xzf helm-v3.18.6-linux-amd64.tar.gz && mv linux-amd64/helm "$HOME/bin/"
+          curl -sSLO https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+          curl -sSLO https://github.com/yannh/kubeconform/releases/download/v0.7.0/CHECKSUMS
+          grep kubeconform-linux-amd64.tar.gz CHECKSUMS | sha256sum -c -
+          tar xzf kubeconform-linux-amd64.tar.gz kubeconform && mv kubeconform "$HOME/bin/"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Kiểm tra
+        env: { TEMPLATES_DIR: templates }
+        run: tools/validate.sh

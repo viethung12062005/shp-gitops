@@ -1,0 +1,9 @@
+# Values của ml ở prod. image.digest do pipeline svc-ml (gitops-promote) ghi — KHÔNG sửa tay.
+# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+image:
+  repository: ""            # <acrLoginServer>/ml — điền cùng lúc với envs/prod/platform.yaml
+  digest: ""
+env:
+  OTEL_SERVICE_NAME: ml
+rollout:
+  enabled: true                # canary 10% → 50% → 100% (MLO-03)

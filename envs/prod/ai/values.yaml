@@ -1,0 +1,10 @@
+# Values của ai ở prod. image.digest do pipeline svc-ai (gitops-promote) ghi — KHÔNG sửa tay.
+# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+image:
+  repository: ""            # <acrLoginServer>/ai — điền cùng lúc với envs/prod/platform.yaml
+  digest: ""
+env:
+  OTEL_SERVICE_NAME: ai
+resources:
+  requests: { cpu: 200m, memory: 512Mi }
+  limits: { memory: 1Gi }
