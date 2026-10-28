@@ -1,4 +1,4 @@
-# Kiểm tra mọi PR vào repo GitOps (kể cả PR promote của bot): YAML, render, kubeconform. Không deploy gì — Argo CD làm việc đó.
+# Validate every PR to the GitOps repo (including the bot's promote PRs): YAML, render, kubeconform. Deploys nothing; Argo CD does that.
 name: validate
 on:
   pull_request:
@@ -17,9 +17,9 @@ jobs:
           repository: viethung12062005/shp-platform-templates
           ref: main   # TODO CIT-09: ghim tag chart-v0.1.0
           path: templates
-          # Repo templates là private: GITHUB_TOKEN không đọc được repo khác, dùng deploy key chỉ-đọc (secret TEMPLATES_DEPLOY_KEY).
+          # The templates repo is private: GITHUB_TOKEN cannot read other repos, so use a read-only deploy key (secret TEMPLATES_DEPLOY_KEY).
           ssh-key: ${{ secrets.TEMPLATES_DEPLOY_KEY }}
-      - name: Cài helm 3.18.6 + kubeconform 0.7.0 (kiểm checksum)
+      - name: Install helm 3.18.6 + kubeconform 0.7.0 (checksum verified)
         run: |
           set -euo pipefail
           mkdir -p "$HOME/bin" && cd "$(mktemp -d)"
@@ -31,6 +31,6 @@ jobs:
           grep kubeconform-linux-amd64.tar.gz CHECKSUMS | sha256sum -c -
           tar xzf kubeconform-linux-amd64.tar.gz kubeconform && mv kubeconform "$HOME/bin/"
           echo "$HOME/bin" >> "$GITHUB_PATH"
-      - name: Kiểm tra
+      - name: Validate
         env: { TEMPLATES_DIR: templates }
         run: tools/validate.sh
