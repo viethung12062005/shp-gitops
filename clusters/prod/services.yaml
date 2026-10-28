@@ -25,7 +25,7 @@ spec:
       project: shp-apps
       sources:
         - repoURL: https://github.com/viethung12062005/shp-platform-templates.git
-          targetRevision: work/initial-baseline   # TODO CIT-09: ghim tag chart-v0.1.0 khi phát hành chart
+          targetRevision: main   # TODO CIT-09: ghim tag chart-v0.1.0 khi phát hành chart
           path: charts/microservice
           helm:
             releaseName: "{{path.basename}}"
