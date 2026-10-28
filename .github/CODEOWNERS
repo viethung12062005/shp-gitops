@@ -1,0 +1,5 @@
+# Mọi thay đổi cần SA duyệt; envs/prod là vùng nhạy cảm nhất.
+* @viethung12062005
+/envs/prod/ @viethung12062005
+/clusters/prod/ @viethung12062005
+/platform/ @viethung12062005

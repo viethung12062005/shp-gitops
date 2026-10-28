@@ -17,6 +17,8 @@ jobs:
           repository: viethung12062005/shp-platform-templates
           ref: main   # TODO CIT-09: ghim tag chart-v0.1.0
           path: templates
+          # Repo templates là private: GITHUB_TOKEN không đọc được repo khác, dùng deploy key chỉ-đọc (secret TEMPLATES_DEPLOY_KEY).
+          ssh-key: ${{ secrets.TEMPLATES_DEPLOY_KEY }}
       - name: Cài helm 3.18.6 + kubeconform 0.7.0 (kiểm checksum)
         run: |
           set -euo pipefail
