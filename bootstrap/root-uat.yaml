@@ -9,7 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
     targetRevision: main
     path: clusters/uat
   destination:

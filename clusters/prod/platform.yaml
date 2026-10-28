@@ -34,7 +34,7 @@ spec:
             valueFiles:
               - $values/platform/addons/{{ .name }}/values.yaml
               - $values/envs/prod/addons/{{ .name }}.yaml
-        - repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+        - repoURL: https://github.com/viethung12062005/shp-gitops.git
           targetRevision: main
           ref: values
       destination:
@@ -56,7 +56,7 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://github.com/viethung12062005/shp-gitops-scratch.git
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
     targetRevision: main
     path: platform/charts/shp-baseline
     helm:
