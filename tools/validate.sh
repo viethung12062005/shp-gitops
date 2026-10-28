@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 STRICT=${1:-}
-TEMPLATES_DIR=${TEMPLATES_DIR:-../shp-platform-templates-scratch}
+TEMPLATES_DIR=${TEMPLATES_DIR:-../shp-platform-templates}
 CHART="$TEMPLATES_DIR/charts/microservice"
 OUT=$(mktemp -d); trap 'rm -rf "$OUT"' EXIT
 fail=0

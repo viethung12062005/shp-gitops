@@ -46,7 +46,7 @@ Application Insights, do ENV-01 tạo trực tiếp trong cụm từ Key Vault. 
 
 ## Kiểm tra cục bộ
 ```bash
-TEMPLATES_DIR=../shp-platform-templates-scratch tools/validate.sh   # cần helm 3.18, kubeconform 0.7, python3 + PyYAML
+TEMPLATES_DIR=../shp-platform-templates tools/validate.sh   # cần helm 3.18, kubeconform 0.7, python3 + PyYAML
 ```
 Script kiểm YAML, so `clusters/uat` với `prod`, render chart nền và 8 service × 2 môi trường, rồi chạy kubeconform kèm schema CRD
 (Argo CD, Kyverno, Gateway API, cert-manager, Argo Rollouts).

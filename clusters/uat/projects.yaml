@@ -7,7 +7,7 @@ metadata:
 spec:
   description: Add-on nền tảng của cụm uat (SA)
   sourceRepos:
-    - https://github.com/viethung12062005/shp-gitops-scratch.git
+    - https://github.com/viethung12062005/shp-gitops.git
     - https://charts.jetstack.io
     - https://kyverno.github.io/kyverno
     - https://argoproj.github.io/argo-helm
@@ -27,8 +27,8 @@ metadata:
 spec:
   description: 8 service ứng dụng của cụm uat
   sourceRepos:
-    - https://github.com/viethung12062005/shp-gitops-scratch.git
-    - https://github.com/viethung12062005/shp-platform-templates-scratch.git
+    - https://github.com/viethung12062005/shp-gitops.git
+    - https://github.com/viethung12062005/shp-platform-templates.git
   destinations:
     - { server: https://kubernetes.default.svc, namespace: shp-apps }
   clusterResourceWhitelist: []          # service không được tạo tài nguyên cấp cụm
