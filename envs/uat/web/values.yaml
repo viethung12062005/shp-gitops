@@ -1,0 +1,29 @@
+# Values of the web app (SPA on nginx) in uat. image.digest is written by the svc-web pipeline (gitops-promote): do NOT edit.
+# The Application is only created once the digest is non-empty (clusters/uat/services.yaml).
+image:
+  repository: ""            # <acrLoginServer>/web — fill in together with envs/uat/platform.yaml
+  digest: ""
+env:
+  OTEL_SERVICE_NAME: web
+probes:
+  readyPath: /healthz
+  livePath: /healthz
+httpRoute:
+  enabled: true
+  parentRefs: [ { name: shp-gateway } ]
+  pathPrefix: /             # everything except /fhir and /api (those go to the API gateway)
+# Runtime config read by the browser at /config.json. FILL IN before provisioning (not secrets):
+#   authority: Entra ID issuer, https://login.microsoftonline.com/<tenant-id>/v2.0
+#   clientId:  application (client) ID of the SPA app registration (IAC-16)
+#   scope:     must include the API scope, otherwise the access token is for Graph and the gateway returns 401
+configFiles:
+  - path: /usr/share/nginx/html/config.json
+    content: |
+      {"authMode": "oidc", "authority": "", "clientId": "", "scope": "openid profile email api://shp-api-uat/access_as_user", "apiBase": ""}
+networkPolicy:
+  ingressFrom:
+    # Envoy proxy runs in the envoy-gateway-system namespace
+    - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: envoy-gateway-system } }
+resources:
+  requests: { cpu: 20m, memory: 32Mi }
+  limits: { memory: 64Mi }
