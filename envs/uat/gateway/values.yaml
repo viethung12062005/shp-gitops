@@ -8,6 +8,7 @@ env:
 httpRoute:
   enabled: true
   parentRefs: [ { name: shp-gateway } ]
+  pathPrefixes: [/fhir, /api]   # the web app (envs/<env>/web) serves everything else, including /
 networkPolicy:
   ingressFrom:
     # Envoy proxy chạy ở namespace envoy-gateway-system

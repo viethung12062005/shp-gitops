@@ -43,6 +43,9 @@ kubeconform -strict -summary "${SCHEMAS[@]}" "$OUT"/*.yaml clusters/*/*.yaml boo
 
 echo "== 4. Required placeholders still empty"
 empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository): ""' envs || true)
+# Web app runtime config (JSON inside envs/<env>/web/values.yaml): login server and SPA client ID.
+web_empty=$(grep -rnE '"(authority|clientId)": ""' envs || true)
+empty=$(printf '%s\n%s\n' "$empty" "$web_empty" | sed '/^$/d')
 if [ -n "$empty" ]; then
   echo "$empty" | sed 's/^/  /'
   [ "$STRICT" = --strict ] && { echo "  --strict: must be filled in before provisioning an environment"; fail=1; } || echo "  (warning; fill in before provisioning an environment)"
