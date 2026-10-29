@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   checks:
-    uses: viethung12062005/shp-platform-templates/.github/workflows/pr-checks.yml@v0.1.4
+    uses: viethung12062005/shp-platform-templates/.github/workflows/pr-checks.yml@v0.1.5
     permissions:
       contents: read
       pull-requests: read
