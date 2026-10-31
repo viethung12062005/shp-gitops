@@ -1,7 +1,7 @@
 # Values chung cho mọi service trong cụm uat. ĐIỀN các ô trống trước khi dựng (không phải secret).
 env:
-  OIDC_AUTHORITY: ""        # Entra ID: https://login.microsoftonline.com/<tenant-id>/v2.0
-  OIDC_AUDIENCE: ""         # Application ID URI của API, vd. api://shp-api-uat
+  OIDC_AUTHORITY: ""        # Keycloak (ADR-0017): https://<gateway.hostname>/idp/realms/shp
+  OIDC_AUDIENCE: ""         # audience của API trong realm Keycloak: shp-api
   SHP_REQUIRE_MFA_FOR_STAFF: "true"
 replicaCount: 1
 pdb:
