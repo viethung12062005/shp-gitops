@@ -36,7 +36,7 @@ flowchart LR
 4. **Rollback:** `git revert` commit promote rồi merge. Argo CD đưa về digest cũ, thường dưới 5 phút.
 
 ## Trước khi dựng một môi trường (ENV-01)
-Điền các ô đang để trống. Không có ô nào là secret, giá trị lấy từ output Terraform và cấu hình Entra ID:
+Điền các ô đang để trống. Không có ô nào là secret, giá trị lấy từ output Terraform và realm Keycloak (ADR-0017; `OIDC_AUTHORITY` = `https://<gateway.hostname>/idp/realms/shp`, `OIDC_AUDIENCE` = `shp-api`):
 - `envs/<env>/platform.yaml`: `acrLoginServer`, `gateway.hostname`, `gateway.acmeEmail`.
 - `envs/<env>/services.yaml`: `OIDC_AUTHORITY`, `OIDC_AUDIENCE`.
 - `envs/<env>/<svc>/values.yaml`: `image.repository` = `<acrLoginServer>/<svc>`.
