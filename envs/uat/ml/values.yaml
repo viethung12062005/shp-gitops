@@ -5,3 +5,39 @@ image:
   digest: ""
 env:
   OTEL_SERVICE_NAME: ml
+
+# Canary nhẹ hơn prod (MLO-03): ít lưu lượng hơn nên analysis ngắn hơn, autoPromote luôn true (16-mlops §6: uat/local).
+# Cùng ghi chú về canary tầng hạ tầng (đổi image) khác với shadow/canary model (ML-24) như ở envs/prod/ml/values.yaml.
+rollout:
+  enabled: true
+  steps:
+    - setWeight: 20
+    - pause: { duration: 5m }
+    - setWeight: 100
+  analysis:
+    enabled: true
+    compareCanaryStable: true
+    prometheusAddress: http://prometheus.monitoring:9090
+    interval: 1m
+    count: 5
+    metrics:
+      - name: error-rate-vs-baseline
+        query: |
+          (
+            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m]))
+            /
+            clamp_min(sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m])), 1)
+          )
+          -
+          (
+            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[1m]))
+            /
+            clamp_min(sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.stable-hash}}"}[1m])), 1)
+          )
+        successCondition: "result[0] <= 0.005"
+      - name: predict-latency-p95
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(shp_ml_predict_seconds_bucket{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m])) by (le)
+          )
+        successCondition: "result[0] <= 0.1"

@@ -5,5 +5,69 @@ image:
   digest: ""
 env:
   OTEL_SERVICE_NAME: ml
+
+# Canary tự động cho model no-show (MLO-03; 16-mlops §6). Đây là canary ở TẦNG HẠ TẦNG (tỉ lệ lưu lượng dự đoán
+# sang pod đang chạy image mới) — khác với shadow/canary model (ML-24, ML-07) vốn chạy BÊN TRONG mỗi pod bằng
+# alias candidate/production của registry. Hai lớp độc lập: đổi image (ở đây) không đổi alias model, và ngược lại.
 rollout:
-  enabled: true                # canary 10% → 50% → 100% (MLO-03)
+  enabled: true
+  steps:
+    - setWeight: 10
+    - pause: { duration: 30m }   # đủ cho analysis chạy hết count*interval dưới đây ở 10%
+    - setWeight: 50
+    - pause: { duration: 30m }   # đủ cho analysis chạy hết count*interval ở 50%
+    # autoPromote=true (mặc định prod, theo 16-mlops §6: dữ liệu giả, rủi ro thấp): không có bước pause cuối,
+    # Rollout tự lên 100% khi bước 50% đạt. Muốn chờ phê duyệt (GitHub Environment) trước 100%, thêm:
+    #   - pause: {}   # vô thời hạn; gỡ bằng `kubectl argo rollouts promote ml`
+  analysis:
+    enabled: true
+    compareCanaryStable: true   # cần chart microservice đã có args canary-hash/stable-hash (MLO-03, templates PR #6)
+    prometheusAddress: http://prometheus.monitoring:9090   # Managed Prometheus; xác nhận lại khi OBS-04 xong
+    interval: 5m
+    count: 6                  # 6 × 5 phút = 30 phút mỗi bước, khớp bảng 16-mlops §6
+    # Giả định: scrape config gắn nhãn Prometheus `rollouts_pod_template_hash` từ nhãn pod
+    # `rollouts-pod-template-hash` (relabel __meta_kubernetes_pod_label_rollouts_pod_template_hash) — cấu hình khi
+    # OBS-04 dựng Managed Prometheus; chưa có nhãn này thì 2 chỉ số so-với-stable dưới đây không query được gì.
+    metrics:
+      # Vi phạm BẤT KỲ chỉ số nào → Argo Rollouts tự rollback về bản cũ (failureLimit: 0, đặt trong chart).
+      - name: error-rate-vs-baseline
+        # tỉ lệ lỗi ≤ bản cũ (canary-hash=stable) + 0,5 điểm phần trăm
+        query: |
+          (
+            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[5m]))
+            /
+            clamp_min(sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.canary-hash}}"}[5m])), 1)
+          )
+          -
+          (
+            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[5m]))
+            /
+            clamp_min(sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.stable-hash}}"}[5m])), 1)
+          )
+        successCondition: "result[0] <= 0.005"
+      - name: predict-latency-p95
+        # p95 độ trễ dự đoán ≤ 100 ms (M3, NFR)
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(shp_ml_predict_seconds_bucket{rollouts_pod_template_hash="{{args.canary-hash}}"}[5m])) by (le)
+          )
+        successCondition: "result[0] <= 0.1"
+      - name: score-psi
+        # PSI điểm dự đoán giữa candidate (shadow, ML-24) và production < 0,1 — đo trong pod, không theo hash
+        query: "max(shp_ml_score_psi)"
+        successCondition: "result[0] < 0.1"
+      - name: high-risk-rate-stability
+        # tỉ lệ highRisk của bản mới không lệch quá ±5 điểm phần trăm so với bản cũ
+        query: |
+          (
+            sum(rate(shp_ml_high_risk_total{high_risk="true", rollouts_pod_template_hash="{{args.canary-hash}}"}[10m]))
+            /
+            clamp_min(sum(rate(shp_ml_high_risk_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[10m])), 1)
+          )
+          -
+          (
+            sum(rate(shp_ml_high_risk_total{high_risk="true", rollouts_pod_template_hash="{{args.stable-hash}}"}[10m]))
+            /
+            clamp_min(sum(rate(shp_ml_high_risk_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[10m])), 1)
+          )
+        successCondition: "result[0] >= -0.05 && result[0] <= 0.05"
