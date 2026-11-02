@@ -1,0 +1,11 @@
+# PR title must follow the story/task convention (docs/00-git-github.md in smart-hospital-platform, section 2.1); the title becomes
+# the commit on main after squash merge. Re-runs when the title is edited. Pinned to a template release tag.
+name: pr-title
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  title:
+    uses: viethung12062005/shp-platform-templates/.github/workflows/pr-title.yml@v0.1.7
