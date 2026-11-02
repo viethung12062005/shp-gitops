@@ -36,13 +36,13 @@ for env in uat prod; do
     svc=$(basename "$d"); [ "$svc" = addons ] && continue
     helm template "$svc" "$CHART" -f envs/services-common.yaml -f "envs/$env/services.yaml" -f "$d/values.yaml" \
       --set fullnameOverride="$svc" --set image.repository="acrshpci.azurecr.io/$svc" \
-      --set image.digest="sha256:$(printf '0%.0s' {1..64})" > "$OUT/$env-$svc.yaml" || { echo "  render failed: $env/$svc"; fail=1; }
+      --set image.digest="sha256:$(printf '0%.0s' {1..64})" --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000       > "$OUT/$env-$svc.yaml" || { echo "  render failed: $env/$svc"; fail=1; }
   done
 done
 kubeconform -strict -summary "${SCHEMAS[@]}" "$OUT"/*.yaml clusters/*/*.yaml bootstrap/root-*.yaml || fail=1
 
 echo "== 4. Required placeholders still empty"
-empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository): ""' envs || true)
+empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME): ""' envs || true)
 # Web app runtime config (JSON inside envs/<env>/web/values.yaml): login server and SPA client ID.
 web_empty=$(grep -rnE '"(authority|clientId)": ""' envs || true)
 empty=$(printf '%s\n%s\n' "$empty" "$web_empty" | sed '/^$/d')
