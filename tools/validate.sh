@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Validate the GitOps repo: valid YAML, clusters/uat <-> prod differ only by environment name, render the base chart + 8 services x 2 environments,
-# kubeconform (with CRD schemas). Usage: tools/validate.sh [--strict]   (--strict: fail if any "ĐIỀN" (fill-in) placeholder is left empty)
+# kubeconform (with CRD schemas). Usage: tools/validate.sh [--strict]   (--strict: fail if any "FILL IN" placeholder is left empty)
 # Variable: TEMPLATES_DIR = a clone of shp-platform-templates (contains charts/microservice).
 set -euo pipefail
 cd "$(dirname "$0")/.."

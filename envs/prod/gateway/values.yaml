@@ -1,7 +1,7 @@
-# Values của gateway ở prod. image.digest do pipeline svc-gateway (gitops-promote) ghi — KHÔNG sửa tay.
-# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+# Values for gateway in prod. image.digest is written by the svc-gateway pipeline (gitops-promote) — DO NOT edit by hand.
+# The Application is only created once the digest is non-empty (clusters/prod/services.yaml).
 image:
-  repository: ""            # <acrLoginServer>/gateway — điền cùng lúc với envs/prod/platform.yaml
+  repository: ""            # <acrLoginServer>/gateway — fill in together with envs/prod/platform.yaml
   digest: ""
 env:
   OTEL_SERVICE_NAME: gateway
@@ -11,7 +11,7 @@ httpRoute:
   pathPrefixes: [/fhir, /api]   # the web app (envs/<env>/web) serves everything else, including /
 networkPolicy:
   ingressFrom:
-    # Envoy proxy chạy ở namespace envoy-gateway-system
+    # The Envoy proxy runs in namespace envoy-gateway-system
     - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: envoy-gateway-system } }
 resources:
   requests: { cpu: 100m, memory: 384Mi }

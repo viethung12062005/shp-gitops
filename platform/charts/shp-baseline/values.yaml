@@ -1,15 +1,15 @@
-# Ghi đè theo môi trường ở envs/<env>/platform.yaml.
+# Per-environment overrides live in envs/<env>/platform.yaml.
 appsNamespace: shp-apps
-# Registry duy nhất được phép cho image của service, ví dụ acrshpab12cd.azurecr.io (output `acr_login_server` của bootstrap Terraform).
+# The only registry allowed for service images, for example acrshpab12cd.azurecr.io (the `acr_login_server` output of the bootstrap Terraform).
 acrLoginServer: ""
 policies:
-  # Enforce: chặn; Audit: chỉ ghi báo cáo. GOP-07 yêu cầu Enforce ở cả uat và prod.
+  # Enforce: block; Audit: report only. GOP-07 requires Enforce in both uat and prod.
   action: Enforce
-  # Danh tính ký cosign keyless = reusable workflow container.yml của repo templates.
+  # The keyless cosign signing identity is the container.yml reusable workflow of the templates repo.
   signerSubject: "https://github.com/viethung12062005/shp-platform-templates/.github/workflows/container.yml@*"
   signerIssuer: https://token.actions.githubusercontent.com
 gateway:
   enabled: true
-  hostname: ""              # vd. api.uat.<tên miền>; để trống thì Gateway chỉ có listener HTTP (chưa có TLS)
-  acmeEmail: ""             # email nhận thông báo Let's Encrypt (không phải dữ liệu bệnh nhân)
+  hostname: ""              # e.g. api.uat.<domain>; when empty the Gateway only has an HTTP listener (no TLS)
+  acmeEmail: ""             # address that receives Let's Encrypt notices (not patient data)
   acmeServer: https://acme-staging-v02.api.letsencrypt.org/directory

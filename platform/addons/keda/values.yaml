@@ -1,4 +1,4 @@
-# KEDA: scale theo lịch/hàng đợi (PRD-11). Xác thực tới Service Bus bằng Workload Identity.
+# KEDA: scale on a schedule or a queue (PRD-11). Authenticates to Service Bus with Workload Identity.
 podIdentity:
   azureWorkload: { enabled: true }
 resources:

@@ -1,10 +1,10 @@
 ---
 name: Task
-about: Một việc trong backlog (docs/05-plan)
+about: One item in the backlog (docs/05-plan)
 labels: task
 ---
-**ID task:**
+**Task ID:**
 **Story:**
-**Xong khi:**
-**Phụ thuộc:**
-**Ước lượng (giờ):**
+**Done when:**
+**Depends on:**
+**Estimate (hours):**

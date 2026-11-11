@@ -1,37 +1,37 @@
-# Values của ml ở prod. image.digest do pipeline svc-ml (gitops-promote) ghi — KHÔNG sửa tay.
-# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+# Values for ml in prod. image.digest is written by the svc-ml pipeline (gitops-promote) — DO NOT edit by hand.
+# The Application is only created once the digest is non-empty (clusters/prod/services.yaml).
 image:
-  repository: ""            # <acrLoginServer>/ml — điền cùng lúc với envs/prod/platform.yaml
+  repository: ""            # <acrLoginServer>/ml — fill in together with envs/prod/platform.yaml
   digest: ""
 env:
   OTEL_SERVICE_NAME: ml
 
-# Canary tự động cho model no-show (MLO-03; 16-mlops §6). Đây là canary ở TẦNG HẠ TẦNG (tỉ lệ lưu lượng dự đoán
-# sang pod đang chạy image mới) — khác với shadow/canary model (ML-24, ML-07) vốn chạy BÊN TRONG mỗi pod bằng
-# alias candidate/production của registry. Hai lớp độc lập: đổi image (ở đây) không đổi alias model, và ngược lại.
+# Automatic canary for the no-show model (MLO-03; 16-mlops §6). This is a canary at the INFRASTRUCTURE level (the share of prediction traffic
+# that goes to pods running the new image) — different from the shadow/canary model (ML-24, ML-07), which runs INSIDE each pod through
+# the registry's candidate/production aliases. The two layers are independent: changing the image (here) does not change the model alias, and vice versa.
 rollout:
   enabled: true
   steps:
     - setWeight: 10
-    - pause: { duration: 30m }   # đủ cho analysis chạy hết count*interval dưới đây ở 10%
+    - pause: { duration: 30m }   # long enough for the analysis below to finish count*interval at 10%
     - setWeight: 50
-    - pause: { duration: 30m }   # đủ cho analysis chạy hết count*interval ở 50%
-    # autoPromote=true (mặc định prod, theo 16-mlops §6: dữ liệu giả, rủi ro thấp): không có bước pause cuối,
-    # Rollout tự lên 100% khi bước 50% đạt. Muốn chờ phê duyệt (GitHub Environment) trước 100%, thêm:
-    #   - pause: {}   # vô thời hạn; gỡ bằng `kubectl argo rollouts promote ml`
+    - pause: { duration: 30m }   # long enough for the analysis to finish count*interval at 50%
+    # autoPromote=true (the prod default, per 16-mlops §6: fake data, low risk): there is no final pause step,
+    # the Rollout goes to 100% by itself when the 50% step passes. To wait for approval (GitHub Environment) before 100%, add:
+    #   - pause: {}   # indefinite; release it with `kubectl argo rollouts promote ml`
   analysis:
     enabled: true
-    compareCanaryStable: true   # cần chart microservice đã có args canary-hash/stable-hash (MLO-03, templates PR #6)
-    prometheusAddress: http://prometheus.monitoring:9090   # Managed Prometheus; xác nhận lại khi OBS-04 xong
+    compareCanaryStable: true   # requires the canary-hash/stable-hash args in the microservice chart (MLO-03, templates PR #6)
+    prometheusAddress: http://prometheus.monitoring:9090   # Managed Prometheus; confirm once OBS-04 is done
     interval: 5m
-    count: 6                  # 6 × 5 phút = 30 phút mỗi bước, khớp bảng 16-mlops §6
-    # Giả định: scrape config gắn nhãn Prometheus `rollouts_pod_template_hash` từ nhãn pod
-    # `rollouts-pod-template-hash` (relabel __meta_kubernetes_pod_label_rollouts_pod_template_hash) — cấu hình khi
-    # OBS-04 dựng Managed Prometheus; chưa có nhãn này thì 2 chỉ số so-với-stable dưới đây không query được gì.
+    count: 6                  # 6 × 5 minutes = 30 minutes per step, matching the table in 16-mlops §6
+    # Assumption: the scrape config attaches the Prometheus label `rollouts_pod_template_hash` from the pod label
+    # `rollouts-pod-template-hash` (relabel __meta_kubernetes_pod_label_rollouts_pod_template_hash) — configure this when
+    # OBS-04 sets up Managed Prometheus; without that label, the two versus-stable metrics below query nothing.
     metrics:
-      # Vi phạm BẤT KỲ chỉ số nào → Argo Rollouts tự rollback về bản cũ (failureLimit: 0, đặt trong chart).
+      # Any metric violation → Argo Rollouts rolls back to the previous version by itself (failureLimit: 0, set in the chart).
       - name: error-rate-vs-baseline
-        # tỉ lệ lỗi ≤ bản cũ (canary-hash=stable) + 0,5 điểm phần trăm
+        # error rate <= previous version (canary-hash=stable) + 0.5 percentage points
         query: |
           (
             sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[5m]))
@@ -46,18 +46,18 @@ rollout:
           )
         successCondition: "result[0] <= 0.005"
       - name: predict-latency-p95
-        # p95 độ trễ dự đoán ≤ 100 ms (M3, NFR)
+        # p95 prediction latency <= 100 ms (M3, NFR)
         query: |
           histogram_quantile(0.95,
             sum(rate(shp_ml_predict_seconds_bucket{rollouts_pod_template_hash="{{args.canary-hash}}"}[5m])) by (le)
           )
         successCondition: "result[0] <= 0.1"
       - name: score-psi
-        # PSI điểm dự đoán giữa candidate (shadow, ML-24) và production < 0,1 — đo trong pod, không theo hash
+        # PSI of prediction scores between candidate (shadow, ML-24) and production < 0.1 — measured inside the pod, not per hash
         query: "max(shp_ml_score_psi)"
         successCondition: "result[0] < 0.1"
       - name: high-risk-rate-stability
-        # tỉ lệ highRisk của bản mới không lệch quá ±5 điểm phần trăm so với bản cũ
+        # the highRisk rate of the new version stays within ±5 percentage points of the previous version
         query: |
           (
             sum(rate(shp_ml_high_risk_total{high_risk="true", rollouts_pod_template_hash="{{args.canary-hash}}"}[10m]))
