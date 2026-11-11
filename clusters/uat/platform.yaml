@@ -1,5 +1,5 @@
-# Add-on nền tảng (GOP-04..07), ghim version chart. Values: platform/addons/<tên>/values.yaml, ghi đè theo môi trường ở
-# envs/uat/addons/<tên>.yaml (không bắt buộc). Nâng version: sửa ở đây cho uat trước, prod sau.
+# Platform add-ons (GOP-04..07), chart versions pinned. Values: platform/addons/<name>/values.yaml, per-environment overrides in
+# envs/uat/addons/<name>.yaml (optional). Upgrading a version: change it here for uat first, prod afterwards.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -45,7 +45,7 @@ spec:
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
         retry: { limit: 5, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }
 ---
-# Nền của cụm: namespace (PSA restricted), NetworkPolicy default-deny, policy Kyverno, Gateway + TLS. Chart nội bộ, chạy sau add-on.
+# Cluster foundation: namespace (PSA restricted), default-deny NetworkPolicy, Kyverno policies, Gateway + TLS. Local chart, runs after the add-ons.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -66,4 +66,4 @@ spec:
     namespace: shp-apps
   syncPolicy:
     automated: { prune: true, selfHeal: true }
-    retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # chờ CRD của add-on sẵn sàng
+    retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the add-on CRDs to be ready

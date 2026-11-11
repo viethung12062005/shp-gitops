@@ -1,7 +1,7 @@
-# Values của ai ở prod. image.digest do pipeline svc-ai (gitops-promote) ghi — KHÔNG sửa tay.
-# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+# Values for ai in prod. image.digest is written by the svc-ai pipeline (gitops-promote) — DO NOT edit by hand.
+# The Application is only created once the digest is non-empty (clusters/prod/services.yaml).
 image:
-  repository: ""            # <acrLoginServer>/ai — điền cùng lúc với envs/prod/platform.yaml
+  repository: ""            # <acrLoginServer>/ai — fill in together with envs/prod/platform.yaml
   digest: ""
 env:
   OTEL_SERVICE_NAME: ai

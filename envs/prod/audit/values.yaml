@@ -1,7 +1,7 @@
-# Values của audit ở prod. image.digest do pipeline svc-audit (gitops-promote) ghi — KHÔNG sửa tay.
-# Application chỉ được tạo khi digest khác rỗng (clusters/prod/services.yaml).
+# Values for audit in prod. image.digest is written by the svc-audit pipeline (gitops-promote) — DO NOT edit by hand.
+# The Application is only created once the digest is non-empty (clusters/prod/services.yaml).
 image:
-  repository: ""            # <acrLoginServer>/audit — điền cùng lúc với envs/prod/platform.yaml
+  repository: ""            # <acrLoginServer>/audit — fill in together with envs/prod/platform.yaml
   digest: ""
 env:
   OTEL_SERVICE_NAME: audit
