@@ -1,0 +1,503 @@
+# Standard RED dashboard (OBS-01, NFR-O2): rate, errors, duration p50/p95/p99 by the `service` label.
+# Import this JSON into Azure Managed Grafana (IAC-06) or let a Grafana with the dashboard sidecar pick
+# up the ConfigMap label `grafana_dashboard: "1"`. The Prometheus datasource is selected on import.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shp-red-metrics-dashboard
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+    grafana_dashboard: "1"
+data:
+  red-metrics.json: |-
+      {
+        "annotations": {
+          "list": [
+            {
+              "builtIn": 1,
+              "datasource": {
+                "type": "grafana",
+                "uid": "-- Grafana --"
+              },
+              "enable": true,
+              "hide": true,
+              "iconColor": "rgba(0, 211, 255, 1)",
+              "name": "Annotations & Alerts",
+              "type": "dashboard"
+            }
+          ]
+        },
+        "description": "RED metrics (rate, errors, duration p50/p95/p99) for every SHP service, by the Prometheus `service` label (OBS-01, NFR-O2).",
+        "editable": true,
+        "fiscalYearStartMonth": 0,
+        "graphTooltip": 1,
+        "id": null,
+        "links": [],
+        "panels": [
+          {
+            "id": 100,
+            "type": "row",
+            "title": "Rate (requests per second)",
+            "collapsed": false,
+            "gridPos": {
+              "h": 1,
+              "w": 24,
+              "x": 0,
+              "y": 0
+            },
+            "panels": []
+          },
+          {
+            "id": 1,
+            "type": "timeseries",
+            "title": "Request rate by service",
+            "description": "RED rate: requests per second per service. Probe, metrics and info endpoints are excluded.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 1
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "editorMode": "code",
+                "expr": "sum by (service) (rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=~\"$service\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval]))",
+                "legendFormat": "{{service}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "reqps",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 1,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false,
+                  "axisPlacement": "auto"
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true,
+                "calcs": [
+                  "mean",
+                  "max",
+                  "lastNotNull"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 101,
+            "type": "row",
+            "title": "Errors",
+            "collapsed": false,
+            "gridPos": {
+              "h": 1,
+              "w": 24,
+              "x": 0,
+              "y": 9
+            },
+            "panels": []
+          },
+          {
+            "id": 2,
+            "type": "timeseries",
+            "title": "5xx responses per second by service",
+            "description": "Server errors (HTTP 5xx) per second, by service.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 10
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "editorMode": "code",
+                "expr": "sum by (service) (rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=~\"$service\", status=~\"5..\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval]))",
+                "legendFormat": "{{service}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "reqps",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 1,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false,
+                  "axisPlacement": "auto"
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true,
+                "calcs": [
+                  "mean",
+                  "max",
+                  "lastNotNull"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "type": "timeseries",
+            "title": "Error ratio by service",
+            "description": "Share of responses that are 5xx. The NFR-A1 availability SLO allows 0.1% (0.001).",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 10
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "editorMode": "code",
+                "expr": "sum by (service) (rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=~\"$service\", status=~\"5..\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval]))\n/ clamp_min(sum by (service) (rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=~\"$service\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval])), 1e-9)",
+                "legendFormat": "{{service}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 1,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false,
+                  "axisPlacement": "auto"
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true,
+                "calcs": [
+                  "mean",
+                  "max",
+                  "lastNotNull"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 102,
+            "type": "row",
+            "title": "Duration",
+            "collapsed": false,
+            "gridPos": {
+              "h": 1,
+              "w": 24,
+              "x": 0,
+              "y": 18
+            },
+            "panels": []
+          },
+          {
+            "id": 4,
+            "type": "timeseries",
+            "title": "p50 latency by service",
+            "description": "Median (p50) request duration by service.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 8,
+              "x": 0,
+              "y": 19
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "editorMode": "code",
+                "expr": "histogram_quantile(0.50, sum by (le, service) (rate(http_server_requests_seconds_bucket{namespace=\"shp-apps\", service=~\"$service\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval])))",
+                "legendFormat": "{{service}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 1,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false,
+                  "axisPlacement": "auto"
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true,
+                "calcs": [
+                  "mean",
+                  "max",
+                  "lastNotNull"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 5,
+            "type": "timeseries",
+            "title": "p95 latency by service",
+            "description": "95th percentile request duration. NFR-P1 targets <= 0.3 s for GET /fhir/Slot; NFR-P2 <= 0.8 s for POST /fhir/Appointment/$book.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 8,
+              "x": 8,
+              "y": 19
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "editorMode": "code",
+                "expr": "histogram_quantile(0.95, sum by (le, service) (rate(http_server_requests_seconds_bucket{namespace=\"shp-apps\", service=~\"$service\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval])))",
+                "legendFormat": "{{service}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 1,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false,
+                  "axisPlacement": "auto"
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true,
+                "calcs": [
+                  "mean",
+                  "max",
+                  "lastNotNull"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 6,
+            "type": "timeseries",
+            "title": "p99 latency by service",
+            "description": "99th percentile request duration by service.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 8,
+              "x": 16,
+              "y": 19
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "editorMode": "code",
+                "expr": "histogram_quantile(0.99, sum by (le, service) (rate(http_server_requests_seconds_bucket{namespace=\"shp-apps\", service=~\"$service\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[$rate_interval])))",
+                "legendFormat": "{{service}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 1,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false,
+                  "axisPlacement": "auto"
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true,
+                "calcs": [
+                  "mean",
+                  "max",
+                  "lastNotNull"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          }
+        ],
+        "refresh": "30s",
+        "schemaVersion": 39,
+        "tags": [
+          "shp",
+          "red",
+          "obs-01"
+        ],
+        "templating": {
+          "list": [
+            {
+              "name": "DS_PROMETHEUS",
+              "label": "Prometheus",
+              "type": "datasource",
+              "query": "prometheus",
+              "refresh": 1,
+              "hide": 0,
+              "includeAll": false,
+              "multi": false
+            },
+            {
+              "name": "service",
+              "label": "Service",
+              "type": "query",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "definition": "label_values(http_server_requests_seconds_count{namespace=\"shp-apps\"}, service)",
+              "query": "label_values(http_server_requests_seconds_count{namespace=\"shp-apps\"}, service)",
+              "refresh": 2,
+              "includeAll": true,
+              "allValue": ".*",
+              "multi": true,
+              "sort": 1,
+              "current": {
+                "selected": true,
+                "text": [
+                  "All"
+                ],
+                "value": [
+                  "$__all"
+                ]
+              }
+            },
+            {
+              "name": "rate_interval",
+              "label": "Rate interval",
+              "type": "interval",
+              "query": "1m,5m,15m,1h",
+              "auto": false,
+              "auto_count": 30,
+              "auto_min": "1m",
+              "refresh": 2,
+              "current": {
+                "selected": true,
+                "text": "5m",
+                "value": "5m"
+              }
+            }
+          ]
+        },
+        "time": {
+          "from": "now-6h",
+          "to": "now"
+        },
+        "timepicker": {},
+        "timezone": "browser",
+        "title": "SHP - RED metrics by service",
+        "uid": "shp-red-metrics",
+        "version": 1,
+        "weekStart": ""
+      }

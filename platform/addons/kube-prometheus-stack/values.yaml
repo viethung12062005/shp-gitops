@@ -1,0 +1,153 @@
+# In-cluster Prometheus + Alertmanager for SLO and platform alerting (OBS-01..03).
+#
+# Grafana is disabled on purpose: uat/prod show dashboards in Azure Managed Grafana (IAC-06) and the
+# local profile (dev/chart/shp-local-full) runs its own Grafana. The dashboards in
+# platform/observability/dashboards/ are the source of truth imported there; they carry the
+# `grafana_dashboard: "1"` label, so a Grafana with the dashboard sidecar picks them up unchanged.
+#
+# The Prometheus Service is named `prometheus` in namespace `monitoring` because the existing Argo
+# Rollouts AnalysisTemplate (MLO-03, envs/<env>/ml/values.yaml) already queries
+# http://prometheus.monitoring:9090.
+crds:
+  enabled: true
+
+# AKS manages the control plane: etcd, controller-manager, scheduler and kube-proxy are not
+# reachable from the cluster, so the default scrape targets would stay down forever.
+kubeEtcd: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests: { cpu: 25m, memory: 64Mi }
+      limits: { memory: 128Mi }
+
+prometheusOperator:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+kubeStateMetrics:
+  enabled: true
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { memory: 128Mi }
+
+nodeExporter:
+  enabled: true
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { memory: 64Mi }
+
+prometheus:
+  prometheusSpec:
+    serviceName: prometheus
+    replicas: 1
+    # NFR-A1 is a monthly SLO: keep a full 30-day window so the error-budget dashboard can query it.
+    retention: 30d
+    retentionSize: 4GB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    # Load every PrometheusRule in the cluster (OBS-02 and OBS-03 add theirs under
+    # platform/observability/rules/), not only the ones labelled by this Helm release.
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 100m, memory: 512Mi }
+      limits: { memory: 1Gi }
+    additionalScrapeConfigs:
+      # RED metrics of the six Spring Boot services. The chart labels every pod with
+      # app.kubernetes.io/instance=<release name>, and the services ApplicationSet sets the release
+      # name to the service name, so that label becomes the `service` label in every dashboard/rule.
+      - job_name: shp-apps-java
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [shp-apps] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+            regex: gateway|scheduling|clinical|document|notification|audit
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8080"
+            action: keep
+          - source_labels: [__address__, __meta_kubernetes_pod_container_port_number]
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - target_label: __metrics_path__
+            replacement: /prometheus
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+            target_label: service
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      # RED metrics of the two FastAPI services (prometheus_client exposes /metrics).
+      - job_name: shp-apps-python
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [shp-apps] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+            regex: ai|ml
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8080"
+            action: keep
+          - source_labels: [__address__, __meta_kubernetes_pod_container_port_number]
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - target_label: __metrics_path__
+            replacement: /metrics
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+            target_label: service
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      # cert-manager controller metrics (certmanager_certificate_*) for OBS-03 certificate alerts.
+      - job_name: cert-manager
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [cert-manager] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "9402"
+            action: keep
+          - source_labels: [__address__, __meta_kubernetes_pod_container_port_number]
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      # RabbitMQ dead-letter queues (OBS-03). Active only where the RabbitMQ prometheus plugin or
+      # rabbitmq-exporter exposes port 15692; cloud environments use Azure Service Bus, whose DLQ
+      # alert is an Azure Monitor metric alert in shp-infra/modules/servicebus.
+      - job_name: rabbitmq
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [shp-deps] }
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "15692"
+            action: keep
+          - source_labels: [__address__, __meta_kubernetes_pod_container_port_number]
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      # Argo CD application controller and API server metrics (argocd_app_info) for OBS-03.
+      - job_name: argocd-application-controller
+        static_configs:
+          - targets: [argocd-metrics.argocd.svc:8082]
+      - job_name: argocd-server
+        static_configs:
+          - targets: [argocd-server-metrics.argocd.svc:8083]
