@@ -1,4 +1,4 @@
-# Mọi thay đổi cần SA duyệt; envs/prod là vùng nhạy cảm nhất.
+# Every change needs SA approval; envs/prod is the most sensitive area.
 * @viethung12062005
 /envs/prod/ @viethung12062005
 /clusters/prod/ @viethung12062005

@@ -1,7 +1,7 @@
-# ai values for prod. image.digest is written by the svc-ai pipeline (gitops-promote) — do not edit by hand.
-# The Application is created only when the digest is non-empty (clusters/prod/services.yaml).
+# Values for ai in prod. image.digest is written by the svc-ai pipeline (gitops-promote) — DO NOT edit by hand.
+# The Application is only created once the digest is non-empty (clusters/prod/services.yaml).
 image:
-  repository: ""            # <acrLoginServer>/ai — filled together with envs/prod/platform.yaml
+  repository: ""            # <acrLoginServer>/ai — fill in together with envs/prod/platform.yaml
   digest: ""
 # SCF-06: ai runs on the dedicated node pool (shp-infra modules/aks labels it shp/pool=ai and taints it
 # workload=ai:NoSchedule), so the model host cannot be scheduled onto the general app nodes.

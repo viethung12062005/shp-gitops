@@ -1,0 +1,9 @@
+# Weekly dependency updates; PRs are reviewed by the SA (GOV-06).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+    groups:
+      # One PR for all action bumps instead of one per action.
+      actions: { patterns: ["*"] }

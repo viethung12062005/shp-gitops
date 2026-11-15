@@ -1,4 +1,4 @@
-# Policy nằm ở platform/charts/shp-baseline (GOP-07). Kyverno không tự kiểm namespace hệ thống.
+# The policies live in platform/charts/shp-baseline (GOP-07). Kyverno does not police system namespaces.
 admissionController:
   replicas: 3
   container: { resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 512Mi } } }

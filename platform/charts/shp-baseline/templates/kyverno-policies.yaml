@@ -1,12 +1,12 @@
 {{- $ns := .Values.appsNamespace -}}
 {{- $p := .Values.policies -}}
-{{- if not .Values.acrLoginServer }}{{ fail "acrLoginServer là bắt buộc (envs/<env>/platform.yaml)" }}{{ end }}
-# GOP-07: chỉ image từ ACR, đã ký bởi pipeline; cấm :latest; bắt buộc resources và probe. Chỉ áp dụng cho namespace ứng dụng.
+{{- if not .Values.acrLoginServer }}{{ fail "acrLoginServer is required (envs/<env>/platform.yaml)" }}{{ end }}
+# GOP-07: images only from ACR and signed by the pipeline; :latest banned; resources and probes required. Applied to application namespaces only.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: shp-restrict-registry
-  annotations: { policies.kyverno.io/title: "Chỉ image từ ACR của dự án" }
+  annotations: { policies.kyverno.io/title: "Images from the project ACR only" }
 spec:
   validationFailureAction: {{ $p.action }}
   background: true
@@ -14,7 +14,7 @@ spec:
     - name: only-acr
       match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
       validate:
-        message: "Image phải đến từ {{ .Values.acrLoginServer }}"
+        message: "The image must come from {{ .Values.acrLoginServer }}"
         pattern:
           spec:
             =(initContainers): [ { image: "{{ .Values.acrLoginServer }}/*" } ]
@@ -24,7 +24,7 @@ apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: shp-verify-signature
-  annotations: { policies.kyverno.io/title: "Image phải được ký bởi pipeline (cosign keyless)" }
+  annotations: { policies.kyverno.io/title: "The image must be signed by the pipeline (cosign keyless)" }
 spec:
   validationFailureAction: {{ $p.action }}
   webhookTimeoutSeconds: 30
@@ -54,7 +54,7 @@ spec:
     - name: no-latest-tag
       match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
       validate:
-        message: "Không dùng tag :latest; deploy theo digest"
+        message: "Do not use the :latest tag; deploy by digest"
         pattern:
           spec:
             containers: [ { image: "!*:latest" } ]
@@ -70,7 +70,7 @@ spec:
     - name: resources-and-probes
       match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
       validate:
-        message: "Container phải có requests cpu/memory, limit memory, readinessProbe và livenessProbe"
+        message: "The container must set cpu and memory requests, a memory limit, a readinessProbe and a livenessProbe"
         pattern:
           spec:
             containers:
