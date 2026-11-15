@@ -5,9 +5,10 @@
 # platform/observability/dashboards/ are the source of truth imported there; they carry the
 # `grafana_dashboard: "1"` label, so a Grafana with the dashboard sidecar picks them up unchanged.
 #
-# The Prometheus Service is named `prometheus` in namespace `monitoring` because the existing Argo
-# Rollouts AnalysisTemplate (MLO-03, envs/<env>/ml/values.yaml) already queries
-# http://prometheus.monitoring:9090.
+# The existing Argo Rollouts AnalysisTemplate (MLO-03, envs/<env>/ml/values.yaml) already queries
+# http://prometheus.monitoring:9090. kube-prometheus-stack names its own Service
+# `<release>-prometheus`, so platform/observability/prometheus-service.yaml adds the stable
+# `prometheus` Service; the StatefulSet keeps the operator's default governing service.
 crds:
   enabled: true
 
@@ -48,7 +49,6 @@ nodeExporter:
 
 prometheus:
   prometheusSpec:
-    serviceName: prometheus
     replicas: 1
     # NFR-A1 is a monthly SLO: keep a full 30-day window so the error-budget dashboard can query it.
     retention: 30d
