@@ -1,0 +1,514 @@
+# SLO/error-budget dashboard (OBS-02, NFR-O2): NFR-A1 availability, NFR-P1 and NFR-P2.
+# Import this JSON into Azure Managed Grafana (IAC-06) or let a Grafana with the dashboard sidecar pick
+# up the ConfigMap label `grafana_dashboard: "1"`. It reads the recording rules from red-slo.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shp-slo-error-budget-dashboard
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+    grafana_dashboard: "1"
+data:
+  slo-error-budget.json: |-
+      {
+        "annotations": {
+          "list": [
+            {
+              "builtIn": 1,
+              "datasource": {
+                "type": "grafana",
+                "uid": "-- Grafana --"
+              },
+              "enable": true,
+              "hide": true,
+              "name": "Annotations & Alerts",
+              "type": "dashboard"
+            }
+          ]
+        },
+        "description": "SLI/SLO and error-budget dashboard for NFR-A1, NFR-P1 and NFR-P2 (OBS-02, NFR-O2).",
+        "editable": true,
+        "graphTooltip": 1,
+        "id": null,
+        "links": [],
+        "panels": [
+          {
+            "id": 100,
+            "type": "row",
+            "title": "Error budget remaining (rolling 30 days)",
+            "collapsed": false,
+            "gridPos": {
+              "h": 1,
+              "w": 24,
+              "x": 0,
+              "y": 0
+            },
+            "panels": []
+          },
+          {
+            "id": 1,
+            "type": "stat",
+            "title": "NFR-A1 availability: budget remaining",
+            "description": "99.9% availability SLO for the booking and records API. 0% means the monthly error budget is exhausted.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 6,
+              "w": 6,
+              "x": 0,
+              "y": 1
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "expr": "1 - (\n  sum(rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=~\"scheduling|clinical\", uri!~\"/health.*|/prometheus|/metrics|/info\", status=~\"5..\"}[30d]))\n  / clamp_min(sum(rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=~\"scheduling|clinical\", uri!~\"/health.*|/prometheus|/metrics|/info\"}[30d])), 1e-9)\n) / 0.001",
+                "instant": true,
+                "range": false,
+                "refId": "A",
+                "legendFormat": "remaining"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": -1,
+                "max": 1,
+                "decimals": 1,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "orientation": "auto",
+              "textMode": "auto",
+              "colorMode": "background",
+              "graphMode": "area",
+              "justifyMode": "auto"
+            }
+          },
+          {
+            "id": 2,
+            "type": "stat",
+            "title": "NFR-P1 find slots: latency budget remaining",
+            "description": "95% of GET /fhir/Slot requests must finish under 300 ms (p95 <= 300 ms).",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 6,
+              "w": 6,
+              "x": 6,
+              "y": 1
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "expr": "1 - (\n  1 - (\n    sum(rate(http_server_requests_seconds_bucket{namespace=\"shp-apps\", service=\"scheduling\", uri=\"/fhir/Slot\", method=\"GET\", le=\"0.3\"}[30d]))\n    / clamp_min(sum(rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=\"scheduling\", uri=\"/fhir/Slot\", method=\"GET\"}[30d])), 1e-9)\n  )\n) / 0.05",
+                "instant": true,
+                "range": false,
+                "refId": "A",
+                "legendFormat": "remaining"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": -1,
+                "max": 1,
+                "decimals": 1,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "orientation": "auto",
+              "textMode": "auto",
+              "colorMode": "background",
+              "graphMode": "area",
+              "justifyMode": "auto"
+            }
+          },
+          {
+            "id": 3,
+            "type": "stat",
+            "title": "NFR-P2 booking: latency budget remaining",
+            "description": "95% of POST /fhir/Appointment/$book requests must finish under 800 ms (p95 <= 800 ms).",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 6,
+              "w": 6,
+              "x": 12,
+              "y": 1
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "expr": "1 - (\n  1 - (\n    sum(rate(http_server_requests_seconds_bucket{namespace=\"shp-apps\", service=\"scheduling\", uri=\"/fhir/Appointment/$book\", method=\"POST\", le=\"0.8\"}[30d]))\n    / clamp_min(sum(rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=\"scheduling\", uri=\"/fhir/Appointment/$book\", method=\"POST\"}[30d])), 1e-9)\n  )\n) / 0.05",
+                "instant": true,
+                "range": false,
+                "refId": "A",
+                "legendFormat": "remaining"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": -1,
+                "max": 1,
+                "decimals": 1,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "orientation": "auto",
+              "textMode": "auto",
+              "colorMode": "background",
+              "graphMode": "area",
+              "justifyMode": "auto"
+            }
+          },
+          {
+            "id": 4,
+            "type": "stat",
+            "title": "NFR-P2 booking: success budget remaining",
+            "description": "5xx rate for POST /fhir/Appointment/$book must stay below 0.1%.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 6,
+              "w": 6,
+              "x": 18,
+              "y": 1
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "expr": "1 - (\n  sum(rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=\"scheduling\", uri=\"/fhir/Appointment/$book\", method=\"POST\", status=~\"5..\"}[30d]))\n  / clamp_min(sum(rate(http_server_requests_seconds_count{namespace=\"shp-apps\", service=\"scheduling\", uri=\"/fhir/Appointment/$book\", method=\"POST\"}[30d])), 1e-9)\n) / 0.001",
+                "instant": true,
+                "range": false,
+                "refId": "A",
+                "legendFormat": "remaining"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": -1,
+                "max": 1,
+                "decimals": 1,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0.0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "orientation": "auto",
+              "textMode": "auto",
+              "colorMode": "background",
+              "graphMode": "area",
+              "justifyMode": "auto"
+            }
+          },
+          {
+            "id": 101,
+            "type": "row",
+            "title": "Burn rate",
+            "collapsed": false,
+            "gridPos": {
+              "h": 1,
+              "w": 24,
+              "x": 0,
+              "y": 7
+            },
+            "panels": []
+          },
+          {
+            "id": 5,
+            "type": "timeseries",
+            "title": "Burn rate by SLO (1h window)",
+            "description": "Burn rate = observed bad-request ratio / error budget. The pages fire above 14.4x (1h) and 6x (6h).",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "expr": "(slo:availability:error_ratio1h / 0.001)\nor (slo:p1-find-slots:error_ratio1h / 0.05)\nor (slo:p2-book-appointment:error_ratio1h / 0.05)\nor (slo:p2-booking-success:error_ratio1h / 0.001)",
+                "legendFormat": "{{slo}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "none",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 2,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "red",
+                      "value": 14.4
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "showLegend": true,
+                "calcs": [
+                  "lastNotNull",
+                  "max"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Bad-request ratio by SLO (5m window)",
+            "description": "Bad-request ratio per SLO over 5 minutes. Targets: 0.001 for availability/success, 0.05 for latency.",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            },
+            "targets": [
+              {
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "${DS_PROMETHEUS}"
+                },
+                "expr": "(slo:availability:error_ratio5m)\nor (slo:p1-find-slots:error_ratio5m)\nor (slo:p2-book-appointment:error_ratio5m)\nor (slo:p2-booking-success:error_ratio5m)",
+                "legendFormat": "{{slo}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "custom": {
+                  "drawStyle": "line",
+                  "lineWidth": 2,
+                  "fillOpacity": 8,
+                  "showPoints": "never",
+                  "spanNulls": false
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "displayMode": "table",
+                "placement": "right",
+                "showLegend": true,
+                "calcs": [
+                  "lastNotNull",
+                  "max"
+                ]
+              },
+              "tooltip": {
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          {
+            "id": 7,
+            "type": "text",
+            "title": "SLO targets and alert policy",
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 16
+            },
+            "options": {
+              "mode": "markdown",
+              "content": "| SLO | Target | Error budget |\n|---|---|---|\n| NFR-A1 availability (scheduling + clinical) | 99.9% | 0.1% |\n| NFR-P1 find free slots (GET /fhir/Slot) | 95% under 300 ms | 5% |\n| NFR-P2 book an appointment (POST /fhir/Appointment/$book) | 95% under 800 ms | 5% |\n| NFR-P2 book an appointment | 5xx < 0.1% | 0.1% |\n\nMulti-window burn-rate alerts (PrometheusRule `shp-slo-rules`):\n\n- **Fast** (critical/page): 1h and 5m burn rate > 14.4x.\n- **Slow** (warning/ticket): 6h and 30m burn rate > 6x.\n- **Ticket**: 3d and 6h burn rate > 1x.\n\nTargets: `docs/02-requirements/non-functional-requirements.md` (NFR-A1, P1, P2)."
+            }
+          }
+        ],
+        "refresh": "1m",
+        "schemaVersion": 39,
+        "tags": [
+          "shp",
+          "slo",
+          "obs-02"
+        ],
+        "templating": {
+          "list": [
+            {
+              "name": "DS_PROMETHEUS",
+              "label": "Prometheus",
+              "type": "datasource",
+              "query": "prometheus",
+              "refresh": 1,
+              "hide": 0,
+              "includeAll": false,
+              "multi": false
+            }
+          ]
+        },
+        "time": {
+          "from": "now-7d",
+          "to": "now"
+        },
+        "timepicker": {},
+        "timezone": "browser",
+        "title": "SHP - SLOs and error budget",
+        "uid": "shp-slo-error-budget",
+        "version": 1,
+        "weekStart": ""
+      }
