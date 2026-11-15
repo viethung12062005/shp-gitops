@@ -1,4 +1,4 @@
-# Envoy Gateway (Gateway API). GatewayClass/Gateway/TLS khai báo ở shp-baseline (GOP-05).
+# Envoy Gateway (Gateway API). GatewayClass/Gateway/TLS are declared in shp-baseline (GOP-05).
 deployment:
   replicas: 2
   envoyGateway:

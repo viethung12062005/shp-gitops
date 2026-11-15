@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   name: {{ .Values.appsNamespace }}
   labels:
-    # Pod Security Admission mức restricted (NFR-SEC7, GOP-08)
+    # Pod Security Admission at restricted level (NFR-SEC7, GOP-08)
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
     pod-security.kubernetes.io/warn: restricted
     shp.example.org/apps: "true"
 ---
-# Mặc định chặn mọi luồng vào; mỗi service mở đúng nguồn được phép bằng networkPolicy.ingressFrom trong values của nó.
+# Deny all inbound traffic by default; each service opens exactly the sources it allows through networkPolicy.ingressFrom in its values.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
