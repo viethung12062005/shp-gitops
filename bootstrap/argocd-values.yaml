@@ -1,12 +1,12 @@
-# Values khi cài Argo CD lần đầu (ENV-01 chạy: helm upgrade --install argocd argo/argo-cd --version 10.11.5 -n argocd -f bootstrap/argocd-values.yaml).
-# Sau đó áp dụng bootstrap/root-<env>.yaml; từ đó mọi thứ khác do Argo CD tự đồng bộ từ repo này.
+# Values for the first Argo CD install (ENV-01 runs: helm upgrade --install argocd argo/argo-cd --version 10.11.5 -n argocd -f bootstrap/argocd-values.yaml).
+# Then apply bootstrap/root-<env>.yaml; from that point on Argo CD syncs everything else from this repo.
 global:
-  domain: ""                  # UI không mở ra Internet; truy cập bằng kubectl port-forward
+  domain: ""                  # the UI is not exposed to the Internet; reach it with kubectl port-forward
 configs:
   params:
     server.insecure: false
   cm:
-    admin.enabled: false      # không dùng tài khoản admin cục bộ; đăng nhập qua Entra ID (OIDC) — cấu hình ở ENV-01
+    admin.enabled: false      # no local admin account; sign in through Entra ID (OIDC) — configured in ENV-01
     timeout.reconciliation: 120s
     resource.exclusions: |
       - apiGroups: ["cilium.io"]

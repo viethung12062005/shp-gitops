@@ -1,4 +1,4 @@
-# Canary cho prod/ml (GOP-09, MLO-03); dashboard tắt (không mở UI ra ngoài).
+# Canary for prod/ml (GOP-09, MLO-03); dashboard off (the UI is not exposed).
 dashboard: { enabled: false }
 controller:
   replicas: 2

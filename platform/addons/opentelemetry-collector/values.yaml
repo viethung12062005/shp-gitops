@@ -1,5 +1,5 @@
-# Nhận OTLP từ mọi service (SHP_OTLP_EXPORT=true), xuất sang Azure Monitor (GOP-06).
-# Connection string Application Insights: Secret `appinsights` do ENV-01 tạo từ Key Vault — không nằm trong repo.
+# Receives OTLP from every service (SHP_OTLP_EXPORT=true), exports to Azure Monitor (GOP-06).
+# Application Insights connection string: the `appinsights` Secret is created by ENV-01 from Key Vault — it is not in the repo.
 mode: deployment
 replicaCount: 2
 image: { repository: otel/opentelemetry-collector-contrib }

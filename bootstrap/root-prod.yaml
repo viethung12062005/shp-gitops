@@ -1,5 +1,5 @@
-# Root Application (app-of-apps) cho cụm prod. ENV-01 áp dụng file này đúng một lần sau khi cài Argo CD.
-# Credential đọc repo (GitHub App, chỉ quyền đọc) do ENV-01 tạo thành Secret trong namespace argocd — không nằm trong repo.
+# Root Application (app-of-apps) for the prod cluster. ENV-01 applies this file exactly once after Argo CD is installed.
+# The repo read credential (a GitHub App with read access only) is created by ENV-01 as a Secret in namespace argocd — it is not in the repo.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

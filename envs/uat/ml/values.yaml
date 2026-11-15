@@ -1,13 +1,13 @@
-# Values của ml ở uat. image.digest do pipeline svc-ml (gitops-promote) ghi — KHÔNG sửa tay.
-# Application chỉ được tạo khi digest khác rỗng (clusters/uat/services.yaml).
+# Values for ml in uat. image.digest is written by the svc-ml pipeline (gitops-promote) — DO NOT edit by hand.
+# The Application is only created once the digest is non-empty (clusters/uat/services.yaml).
 image:
-  repository: ""            # <acrLoginServer>/ml — điền cùng lúc với envs/uat/platform.yaml
+  repository: ""            # <acrLoginServer>/ml — fill in together with envs/uat/platform.yaml
   digest: ""
 env:
   OTEL_SERVICE_NAME: ml
 
-# Canary nhẹ hơn prod (MLO-03): ít lưu lượng hơn nên analysis ngắn hơn, autoPromote luôn true (16-mlops §6: uat/local).
-# Cùng ghi chú về canary tầng hạ tầng (đổi image) khác với shadow/canary model (ML-24) như ở envs/prod/ml/values.yaml.
+# A lighter canary than prod (MLO-03): less traffic, so the analysis is shorter and autoPromote is always true (16-mlops §6: uat/local).
+# Same note as in envs/prod/ml/values.yaml about the infrastructure-level canary (image change) versus the shadow/canary model (ML-24).
 rollout:
   enabled: true
   steps:

@@ -1,6 +1,6 @@
-# Một Application cho mỗi service có envs/prod/<service>/values.yaml VÀ đã có image.digest (pipeline gitops-promote ghi).
-# Service chưa promote lần nào (digest rỗng) không được tạo Application — chart microservice từ chối render khi thiếu digest.
-# Không dùng goTemplate để post-selector lọc được theo khóa phẳng `image.digest`.
+# One Application per service that has envs/prod/<service>/values.yaml AND already has an image.digest (written by the gitops-promote pipeline).
+# A service that has never been promoted (empty digest) gets no Application — the microservice chart refuses to render without a digest.
+# goTemplate is not used, so the post-selector can filter on the flat `image.digest` key.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -25,7 +25,7 @@ spec:
       project: shp-apps
       sources:
         - repoURL: https://github.com/viethung12062005/shp-platform-templates.git
-          targetRevision: main   # TODO CIT-09: ghim tag chart-v0.1.0 khi phát hành chart
+          targetRevision: main   # TODO CIT-09: pin tag chart-v0.1.0 once the chart is released
           path: charts/microservice
           helm:
             releaseName: "{{path.basename}}"
