@@ -6,14 +6,16 @@ image:
 env:
   OTEL_SERVICE_NAME: ml
 
-# A lighter canary than prod (MLO-03): less traffic, so the analysis is shorter and autoPromote is always true (16-mlops §6: uat/local).
+# A lighter canary than prod (MLO-03): less traffic, a 5-minute analysis window, and autoPromote=true — there is
+# no indefinite `pause: {}` step, so the Rollout runs through to 100% by itself (16-mlops §6: uat/local). Prod
+# sets autoPromote=false with an explicit promotion gate; see envs/prod/ml/values.yaml.
 # Same note as in envs/prod/ml/values.yaml about the infrastructure-level canary (image change) versus the shadow/canary model (ML-24).
 rollout:
   enabled: true
   steps:
     - setWeight: 20
-    - pause: { duration: 5m }
-    - setWeight: 100
+    - pause: { duration: 5m }   # background analysis window (count*interval); a failure aborts the Rollout
+    - setWeight: 100            # autoPromote=true: no manual pause before 100%
   analysis:
     enabled: true
     compareCanaryStable: true
