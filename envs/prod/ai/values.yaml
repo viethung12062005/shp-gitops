@@ -3,8 +3,18 @@
 image:
   repository: ""            # <acrLoginServer>/ai — fill in together with envs/prod/platform.yaml
   digest: ""
+# SCF-06: ai runs on the dedicated node pool (shp-infra modules/aks labels it shp/pool=ai and taints it
+# workload=ai:NoSchedule), so the model host cannot be scheduled onto the general app nodes.
+nodeSelector:
+  shp/pool: ai
+tolerations:
+  - key: workload
+    operator: Equal
+    value: ai
+    effect: NoSchedule
 env:
   OTEL_SERVICE_NAME: ai
 resources:
   requests: { cpu: 200m, memory: 512Mi }
-  limits: { memory: 1Gi }
+  # bge-m3 + qwen2.5-7b live in this pod; the node pool is sized ~8-10 GB (ADR-0013).
+  limits: { memory: 8Gi }
