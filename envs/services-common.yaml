@@ -1,11 +1,42 @@
-# Values chung cho MỌI service ở MỌI môi trường (nạp trước envs/<env>/services.yaml và envs/<env>/<svc>/values.yaml).
-# Mặc định an toàn của chart giữ nguyên; ở đây chỉ thêm phần riêng của dự án.
+# Values shared by EVERY service in EVERY environment (loaded before envs/<env>/services.yaml and
+# envs/<env>/<svc>/values.yaml). The chart's safe defaults stay; this file adds only what the project needs.
 env:
   SHP_OTLP_EXPORT: "true"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector.observability:4318
   SHP_CLINICAL_URL: http://clinical
 networkPolicy:
   enabled: true
-  # Mặc định: chỉ nhận từ pod cùng namespace (gateway → service, gọi /internal giữa service).
+  # Ingress: only from pods in the same namespace (gateway -> service, service -> service on /internal).
   ingressFrom:
     - podSelector: {}
+  # Egress (GOP-08, 10-network-trust-zones Z2/Z3): default-deny outbound, then open only what a service needs.
+  # Without this a compromised pod can reach anything the node can — the audit found egress unrestricted.
+  egress:
+    # DNS, or every name lookup fails.
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    # Same namespace: gateway -> service, /internal calls, OTel collector.
+    - to:
+        - podSelector: {}
+    # Managed dependencies in shp-deps (PostgreSQL, MongoDB, Redis, RabbitMQ, Keycloak, Azurite, search, MLflow).
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: shp-deps } }
+      ports:
+        - { port: 5432, protocol: TCP }
+        - { port: 27017, protocol: TCP }
+        - { port: 6379, protocol: TCP }
+        - { port: 5672, protocol: TCP }
+        - { port: 8080, protocol: TCP }
+        - { port: 10000, protocol: TCP }
+        - { port: 10001, protocol: TCP }
+        - { port: 9200, protocol: TCP }
+        - { port: 5000, protocol: TCP }
+    # Private endpoints and in-VNet Azure services (Service Bus, Key Vault, Blob, AI Search, Monitor) all sit in the
+    # VNet; 10/8 covers the cluster and private-endpoint subnets without naming each CIDR here.
+    - to:
+        - ipBlock: { cidr: 10.0.0.0/8 }
+    # NOTE: no rule for the public internet here. Only `ai` (LLM providers) and `notification` (push/SMS/email)
+    # add `0.0.0.0/0:443` in their own values files — that is the Z4 egress the design allows.

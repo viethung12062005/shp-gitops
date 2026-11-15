@@ -8,3 +8,38 @@ env:
 resources:
   requests: { cpu: 100m, memory: 384Mi }
   limits: { memory: 768Mi }   # JVM: -XX:MaxRAMPercentage=75
+
+networkPolicy:
+  enabled: true
+  # Ingress unchanged: same namespace only (set in envs/services-common.yaml).
+  ingressFrom:
+    - podSelector: {}
+  # Helm REPLACES the shared egress list, so this file repeats it and adds the one rule the design allows for
+  # this service: HTTPS to the public internet (10-network-trust-zones Z4).
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: shp-deps } }
+      ports:
+        - { port: 5432, protocol: TCP }
+        - { port: 27017, protocol: TCP }
+        - { port: 6379, protocol: TCP }
+        - { port: 5672, protocol: TCP }
+        - { port: 8080, protocol: TCP }
+        - { port: 10000, protocol: TCP }
+        - { port: 10001, protocol: TCP }
+        - { port: 9200, protocol: TCP }
+        - { port: 5000, protocol: TCP }
+    - to:
+        - ipBlock: { cidr: 10.0.0.0/8 }
+    # Z4: push (FCM/APNs), SMS and email providers are external APIs
+    - to:
+        - ipBlock: { cidr: 0.0.0.0/0 }
+      ports:
+        - { port: 443, protocol: TCP }
