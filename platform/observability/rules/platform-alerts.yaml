@@ -1,0 +1,117 @@
+# DLQ and pipeline-failure alerts (OBS-03, NFR-O3).
+#
+# Covers the three conditions the NFR names:
+#   - a dead-letter queue has messages
+#   - a TLS certificate is close to expiry
+#   - an Argo CD application is degraded
+#
+# Cloud vs local: uat/prod publish events to Azure Service Bus, whose dead-letter alert is the Azure
+# Monitor metric alert `azurerm_monitor_metric_alert.dead_letter` in shp-infra/modules/servicebus
+# (managed Prometheus does not expose Azure resource metrics under the rabbitmq_* names). This rule
+# covers the portable/local RabbitMQ path, where each consumer has `shp-events.<consumer>.dlq`
+# (docs/03-architecture/detailed-design/13-events.md section 1.1). The scrape job for port 15692 is
+# defined in platform/addons/kube-prometheus-stack/values.yaml.
+#
+# cert-manager and Argo CD metrics are scraped by the jobs in the same values file. The rules below
+# are loaded because Prometheus is configured with ruleSelectorNilUsesHelmValues: false.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shp-platform-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+    prometheus: shp
+spec:
+  groups:
+    - name: shp-dead-letter-queues
+      interval: 30s
+      rules:
+        - alert: ShpRabbitMQDeadLetterQueueNotEmpty
+          expr: |
+            sum by (queue) (rabbitmq_queue_messages{queue=~".+\\.dlq"}) > 0
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Dead-letter queue {{ $labels.queue }} has messages."
+            description: >-
+              One or more events could not be processed after the retry limit and were moved to the
+              dead-letter queue. Use the replay tooling from docs/03-architecture/detailed-design/13-events.md
+              section 1.1, fix the consumer, then replay. A non-empty DLQ is a data-loss risk for the
+              affected consumer, not a transient error.
+
+    - name: shp-certificates
+      interval: 30s
+      rules:
+        - alert: ShpCertificateExpiringIn21Days
+          expr: |
+            (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 21
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TLS certificate {{ $labels.name }} expires in less than 21 days."
+            description: >-
+              cert-manager should renew the certificate automatically. If it does not, check the
+              Certificate object and its issuer in namespace {{ $labels.namespace }}. Time to expiry:
+              {{ $value | printf "%.1f" }} days.
+
+        - alert: ShpCertificateExpiringIn7Days
+          expr: |
+            (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 7
+          for: 15m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "TLS certificate {{ $labels.name }} expires in less than 7 days."
+            description: >-
+              Automatic renewal has not happened; traffic will fail when the certificate expires.
+              Inspect the Certificate and its issuer in namespace {{ $labels.namespace }} now.
+              Time to expiry: {{ $value | printf "%.1f" }} days.
+
+        - alert: ShpCertificateNotReady
+          expr: |
+            certmanager_certificate_ready_status{condition="False"} == 1
+          for: 15m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "TLS certificate {{ $labels.name }} is not Ready."
+            description: >-
+              cert-manager has not issued or renewed the certificate in namespace
+              {{ $labels.namespace }}. Check the Certificate events and the issuer (ACME/Let's Encrypt).
+
+    - name: shp-argocd
+      interval: 30s
+      rules:
+        - alert: ShpArgoCDApplicationDegraded
+          expr: |
+            sum by (name, project) (argocd_app_info{health_status="Degraded"}) > 0
+          for: 10m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Argo CD application {{ $labels.name }} is Degraded."
+            description: >-
+              The desired state in this repository is not healthy in the cluster (project
+              {{ $labels.project }}). Inspect the application's resources and sync events in Argo CD;
+              the pipeline is not delivering a working environment.
+
+        - alert: ShpArgoCDApplicationOutOfSync
+          expr: |
+            sum by (name, project) (argocd_app_info{sync_status="OutOfSync"}) > 0
+          for: 30m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Argo CD application {{ $labels.name }} has been OutOfSync for 30 minutes."
+            description: >-
+              The cluster has drifted from main for project {{ $labels.project }}. Check whether a sync
+              failed (resource error) or self-heal is disabled for this application.
