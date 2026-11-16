@@ -1,0 +1,330 @@
+# SLOs and multi-window, multi-burn-rate alerts for NFR-A1, NFR-P1 and NFR-P2 (OBS-02).
+#
+# Targets (docs/02-requirements/non-functional-requirements.md):
+#   NFR-A1 availability of the booking and records API: 99.9%/month  (budget 0.001)
+#   NFR-P1 find free slots:                             p95 <= 300 ms  (95% of requests under 0.3 s)
+#   NFR-P2 book an appointment:                         p95 <= 800 ms  (95% under 0.8 s)
+#   NFR-P2 book an appointment:                         5xx < 0.1%     (budget 0.001)
+#
+# Each SLO has a bad-request ratio recorded over 5m/30m/1h/6h/3d, and three burn-rate alerts:
+# fast (14.4x over 1h, pages), slow (6x over 6h) and ticket (1x over 3d). The long/short window pair
+# is required so that a short spike does not page while a sustained burn still does.
+# The `service` and `uri` labels come from the shp-apps scrape jobs in
+# platform/addons/kube-prometheus-stack/values.yaml. Prometheus loads this rule because
+# ruleSelectorNilUsesHelmValues is false there.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shp-slo-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+    prometheus: shp
+spec:
+  groups:
+    - name: shp-slo-recording
+      interval: 30s
+      rules:
+        - record: slo:availability:error_ratio5m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info", status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info"}[5m])), 1e-9)
+          labels: {slo: availability, slo_target: "0.999"}
+        - record: slo:availability:error_ratio30m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info", status=~"5.."}[30m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info"}[30m])), 1e-9)
+          labels: {slo: availability, slo_target: "0.999"}
+        - record: slo:availability:error_ratio1h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info", status=~"5.."}[1h]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info"}[1h])), 1e-9)
+          labels: {slo: availability, slo_target: "0.999"}
+        - record: slo:availability:error_ratio6h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info", status=~"5.."}[6h]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info"}[6h])), 1e-9)
+          labels: {slo: availability, slo_target: "0.999"}
+        - record: slo:availability:error_ratio3d
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info", status=~"5.."}[3d]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service=~"scheduling|clinical", uri!~"/health.*|/prometheus|/metrics|/info"}[3d])), 1e-9)
+          labels: {slo: availability, slo_target: "0.999"}
+        - record: slo:p1-find-slots:error_ratio5m
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET", le="0.3"}[5m]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET"}[5m])), 1e-9)
+            )
+          labels: {slo: p1-find-slots, slo_target: "0.95"}
+        - record: slo:p1-find-slots:error_ratio30m
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET", le="0.3"}[30m]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET"}[30m])), 1e-9)
+            )
+          labels: {slo: p1-find-slots, slo_target: "0.95"}
+        - record: slo:p1-find-slots:error_ratio1h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET", le="0.3"}[1h]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET"}[1h])), 1e-9)
+            )
+          labels: {slo: p1-find-slots, slo_target: "0.95"}
+        - record: slo:p1-find-slots:error_ratio6h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET", le="0.3"}[6h]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET"}[6h])), 1e-9)
+            )
+          labels: {slo: p1-find-slots, slo_target: "0.95"}
+        - record: slo:p1-find-slots:error_ratio3d
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET", le="0.3"}[3d]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Slot", method="GET"}[3d])), 1e-9)
+            )
+          labels: {slo: p1-find-slots, slo_target: "0.95"}
+        - record: slo:p2-book-appointment:error_ratio5m
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", le="0.8"}[5m]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[5m])), 1e-9)
+            )
+          labels: {slo: p2-book-appointment, slo_target: "0.95"}
+        - record: slo:p2-book-appointment:error_ratio30m
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", le="0.8"}[30m]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[30m])), 1e-9)
+            )
+          labels: {slo: p2-book-appointment, slo_target: "0.95"}
+        - record: slo:p2-book-appointment:error_ratio1h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", le="0.8"}[1h]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[1h])), 1e-9)
+            )
+          labels: {slo: p2-book-appointment, slo_target: "0.95"}
+        - record: slo:p2-book-appointment:error_ratio6h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", le="0.8"}[6h]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[6h])), 1e-9)
+            )
+          labels: {slo: p2-book-appointment, slo_target: "0.95"}
+        - record: slo:p2-book-appointment:error_ratio3d
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", le="0.8"}[3d]))
+              / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[3d])), 1e-9)
+            )
+          labels: {slo: p2-book-appointment, slo_target: "0.95"}
+        - record: slo:p2-booking-success:error_ratio5m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[5m])), 1e-9)
+          labels: {slo: p2-booking-success, slo_target: "0.999"}
+        - record: slo:p2-booking-success:error_ratio30m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", status=~"5.."}[30m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[30m])), 1e-9)
+          labels: {slo: p2-booking-success, slo_target: "0.999"}
+        - record: slo:p2-booking-success:error_ratio1h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", status=~"5.."}[1h]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[1h])), 1e-9)
+          labels: {slo: p2-booking-success, slo_target: "0.999"}
+        - record: slo:p2-booking-success:error_ratio6h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", status=~"5.."}[6h]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[6h])), 1e-9)
+          labels: {slo: p2-booking-success, slo_target: "0.999"}
+        - record: slo:p2-booking-success:error_ratio3d
+          expr: |
+            sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST", status=~"5.."}[3d]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="shp-apps", service="scheduling", uri="/fhir/Appointment/$book", method="POST"}[3d])), 1e-9)
+          labels: {slo: p2-booking-success, slo_target: "0.999"}
+    - name: shp-slo-burn-rate
+      interval: 30s
+      rules:
+        - alert: SLOAvailabilityBurnRateFast
+          expr: |
+            (slo:availability:error_ratio1h > 14.4 * 0.001)
+            and
+            (slo:availability:error_ratio5m > 14.4 * 0.001)
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+            slo: availability
+            slo_target: "0.999"
+            page: "true"
+          annotations:
+            summary: "NFR-A1 availability of the booking and records API (99.9%) is burning its error budget fast (14.4x over 1h)."
+            description: "The 1h and 5m error ratios are above 14.4x the error budget (0.001) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOAvailabilityBurnRateSlow
+          expr: |
+            (slo:availability:error_ratio6h > 6 * 0.001)
+            and
+            (slo:availability:error_ratio30m > 6 * 0.001)
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+            slo: availability
+            slo_target: "0.999"
+            page: "false"
+          annotations:
+            summary: "NFR-A1 availability of the booking and records API (99.9%) is burning its error budget steadily (6x over 6h)."
+            description: "The 6h and 30m error ratios are above 6x the error budget (0.001) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOAvailabilityBurnRateTicket
+          expr: |
+            (slo:availability:error_ratio3d > 1 * 0.001)
+            and
+            (slo:availability:error_ratio6h > 1 * 0.001)
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+            slo: availability
+            slo_target: "0.999"
+            page: "false"
+          annotations:
+            summary: "NFR-A1 availability of the booking and records API (99.9%) has consumed its error budget over 3 days (1x over 3d)."
+            description: "The 3d and 6h error ratios are above 1x the error budget (0.001) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP1FindSlotsBurnRateFast
+          expr: |
+            (slo:p1-find-slots:error_ratio1h > 14.4 * 0.05)
+            and
+            (slo:p1-find-slots:error_ratio5m > 14.4 * 0.05)
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+            slo: p1-find-slots
+            slo_target: "0.95"
+            page: "true"
+          annotations:
+            summary: "NFR-P1 find free slots p95 <= 300 ms (95% under 300 ms) is burning its error budget fast (14.4x over 1h)."
+            description: "The 1h and 5m error ratios are above 14.4x the error budget (0.05) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP1FindSlotsBurnRateSlow
+          expr: |
+            (slo:p1-find-slots:error_ratio6h > 6 * 0.05)
+            and
+            (slo:p1-find-slots:error_ratio30m > 6 * 0.05)
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+            slo: p1-find-slots
+            slo_target: "0.95"
+            page: "false"
+          annotations:
+            summary: "NFR-P1 find free slots p95 <= 300 ms (95% under 300 ms) is burning its error budget steadily (6x over 6h)."
+            description: "The 6h and 30m error ratios are above 6x the error budget (0.05) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP1FindSlotsBurnRateTicket
+          expr: |
+            (slo:p1-find-slots:error_ratio3d > 1 * 0.05)
+            and
+            (slo:p1-find-slots:error_ratio6h > 1 * 0.05)
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+            slo: p1-find-slots
+            slo_target: "0.95"
+            page: "false"
+          annotations:
+            summary: "NFR-P1 find free slots p95 <= 300 ms (95% under 300 ms) has consumed its error budget over 3 days (1x over 3d)."
+            description: "The 3d and 6h error ratios are above 1x the error budget (0.05) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP2BookAppointmentBurnRateFast
+          expr: |
+            (slo:p2-book-appointment:error_ratio1h > 14.4 * 0.05)
+            and
+            (slo:p2-book-appointment:error_ratio5m > 14.4 * 0.05)
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+            slo: p2-book-appointment
+            slo_target: "0.95"
+            page: "true"
+          annotations:
+            summary: "NFR-P2 book an appointment p95 <= 800 ms (95% under 800 ms) is burning its error budget fast (14.4x over 1h)."
+            description: "The 1h and 5m error ratios are above 14.4x the error budget (0.05) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP2BookAppointmentBurnRateSlow
+          expr: |
+            (slo:p2-book-appointment:error_ratio6h > 6 * 0.05)
+            and
+            (slo:p2-book-appointment:error_ratio30m > 6 * 0.05)
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+            slo: p2-book-appointment
+            slo_target: "0.95"
+            page: "false"
+          annotations:
+            summary: "NFR-P2 book an appointment p95 <= 800 ms (95% under 800 ms) is burning its error budget steadily (6x over 6h)."
+            description: "The 6h and 30m error ratios are above 6x the error budget (0.05) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP2BookAppointmentBurnRateTicket
+          expr: |
+            (slo:p2-book-appointment:error_ratio3d > 1 * 0.05)
+            and
+            (slo:p2-book-appointment:error_ratio6h > 1 * 0.05)
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+            slo: p2-book-appointment
+            slo_target: "0.95"
+            page: "false"
+          annotations:
+            summary: "NFR-P2 book an appointment p95 <= 800 ms (95% under 800 ms) has consumed its error budget over 3 days (1x over 3d)."
+            description: "The 3d and 6h error ratios are above 1x the error budget (0.05) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP2BookingSuccessBurnRateFast
+          expr: |
+            (slo:p2-booking-success:error_ratio1h > 14.4 * 0.001)
+            and
+            (slo:p2-booking-success:error_ratio5m > 14.4 * 0.001)
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+            slo: p2-booking-success
+            slo_target: "0.999"
+            page: "true"
+          annotations:
+            summary: "NFR-P2 booking 5xx error rate < 0.1% is burning its error budget fast (14.4x over 1h)."
+            description: "The 1h and 5m error ratios are above 14.4x the error budget (0.001) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP2BookingSuccessBurnRateSlow
+          expr: |
+            (slo:p2-booking-success:error_ratio6h > 6 * 0.001)
+            and
+            (slo:p2-booking-success:error_ratio30m > 6 * 0.001)
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+            slo: p2-booking-success
+            slo_target: "0.999"
+            page: "false"
+          annotations:
+            summary: "NFR-P2 booking 5xx error rate < 0.1% is burning its error budget steadily (6x over 6h)."
+            description: "The 6h and 30m error ratios are above 6x the error budget (0.001) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
+        - alert: SLOP2BookingSuccessBurnRateTicket
+          expr: |
+            (slo:p2-booking-success:error_ratio3d > 1 * 0.001)
+            and
+            (slo:p2-booking-success:error_ratio6h > 1 * 0.001)
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+            slo: p2-booking-success
+            slo_target: "0.999"
+            page: "false"
+          annotations:
+            summary: "NFR-P2 booking 5xx error rate < 0.1% has consumed its error budget over 3 days (1x over 3d)."
+            description: "The 3d and 6h error ratios are above 1x the error budget (0.001) for this SLO. Inspect the RED dashboard filtered by the SLO service, then the logs and traces of the failing requests (NFR-A1/P1/P2 in docs/02-requirements/non-functional-requirements.md)."
