@@ -1,0 +1,87 @@
+# Model drift and live-performance alerts for the no-show model (MLO-05, NFR-O3).
+#
+# Thresholds: docs/03-architecture/detailed-design/16-mlops.md section 4 (smart-hospital-platform repo).
+#   - feature drift:       PSI > 0.2 in >= 2 of the main features (lead_time_days, prior_noshow, start_hour, channel)
+#   - prediction-score drift: score PSI > 0.2
+#   - actual performance:  14-day rolling AUC dropped > 0.05 below the AUC at registration, with >= 500 labels
+#   - retraining stopped:  the safety limit (2 automatic retrainings per 14 days) was reached
+#
+# Metrics are exported by services/ml/src/shp_ml/metrics.py and set by the daily monitor job (02:00 Vietnam time,
+# monitor.py), so they change once a day. The `service` label is "ml" (scrape job shp-apps-python in
+# platform/addons/kube-prometheus-stack/values.yaml). Every replica runs the monitor, hence `max by (service)`.
+# The registered AUC is not exported, so the AUC-drop alert uses the service's own decision,
+# shp_ml_drift_alert{kind="auc-drop"}, which already applies the 0.05 drop and the 500-label minimum.
+#
+# Routing: `team: ml` is routed to the `ml-owner` receiver in the Alertmanager config of
+# platform/addons/kube-prometheus-stack/values.yaml. Prometheus loads this rule because
+# ruleSelectorNilUsesHelmValues is false there.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shp-mlops-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+    prometheus: shp
+spec:
+  groups:
+    - name: shp-mlops-drift
+      interval: 1m
+      rules:
+        - alert: ShpMlFeatureDrift
+          expr: |
+            count by (service) (shp_ml_feature_psi{service="ml"} > 0.2) >= 2
+          for: 30m
+          labels:
+            severity: warning
+            team: ml
+          annotations:
+            summary: "{{ $value }} input features of the no-show model have PSI above 0.2."
+            description: >-
+              The last 7 days of predictions differ from the training set in at least two main features
+              (see the "Feature PSI" panel of the dashboard SHP - MLOps). The monitor job requests an
+              automatic retraining when it is allowed to (16-mlops section 5); otherwise retrain by hand.
+
+        - alert: ShpMlScoreDrift
+          expr: |
+            max by (service) (shp_ml_score_psi{service="ml"}) > 0.2
+          for: 30m
+          labels:
+            severity: warning
+            team: ml
+          annotations:
+            summary: "Prediction score PSI is {{ $value | printf \"%.2f\" }} (threshold 0.2)."
+            description: >-
+              The distribution of no-show scores moved away from the distribution at model registration.
+              Check the feature PSI panel to see which input changed.
+
+    - name: shp-mlops-performance
+      interval: 1m
+      rules:
+        - alert: ShpMlLiveAucDrop
+          expr: |
+            max by (service) (shp_ml_drift_alert{service="ml", kind="auc-drop"}) == 1
+          for: 30m
+          labels:
+            severity: critical
+            team: ml
+          annotations:
+            summary: "Live AUC of the no-show model dropped more than 0.05 below the registered AUC."
+            description: >-
+              The 14-day rolling AUC over real outcomes (at least 500 labeled appointments) is more than
+              0.05 under the AUC recorded at registration. Look at the "Live AUC" panel, the model version
+              in use and the retraining history; the production model is kept until a retrained candidate
+              passes the quality gate and the canary.
+
+        - alert: ShpMlRetrainingNeedsHuman
+          expr: |
+            max by (service) (shp_ml_drift_alert{service="ml", kind="needs-human"}) == 1
+          for: 5m
+          labels:
+            severity: warning
+            team: ml
+          annotations:
+            summary: "Automatic retraining is stopped by the safety limit; an operator must decide."
+            description: >-
+              Drift or an AUC drop was detected, but two automatic retrainings already ran in the last
+              14 days (16-mlops section 5). Review the model and start a retraining manually if needed.
