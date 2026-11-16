@@ -11,14 +11,30 @@ env:
 # the registry's candidate/production aliases. The two layers are independent: changing the image (here) does not change the model alias, and vice versa.
 rollout:
   enabled: true
+  # autoPromote=false in prod (GOP-09): the empty `pause: {}` step below holds the Rollout before 100% until an
+  # operator promotes it (`kubectl argo rollouts promote ml`, or the GitHub Environment approval). UAT sets
+  # autoPromote=true by omitting that step (envs/uat/ml/values.yaml). Argo Rollouts has no separate autoPromote
+  # field: the presence or absence of the indefinite pause is the per-environment switch. To let prod run through
+  # by itself again (the MLO-03 behavior), delete the `pause: {}` step.
   steps:
     - setWeight: 10
-    - pause: { duration: 30m }   # long enough for the analysis below to finish count*interval at 10%
+    # The strategy-level analysis below starts at startingStep: 1 (this pause) and runs in the background for
+    # count*interval. It does not block promotion, but a failure aborts the Rollout and returns traffic to stable.
+    - pause: { duration: 30m }
     - setWeight: 50
-    - pause: { duration: 30m }   # long enough for the analysis to finish count*interval at 50%
-    # autoPromote=true (the prod default, per 16-mlops §6: fake data, low risk): there is no final pause step,
-    # the Rollout goes to 100% by itself when the 50% step passes. To wait for approval (GitHub Environment) before 100%, add:
-    #   - pause: {}   # indefinite; release it with `kubectl argo rollouts promote ml`
+    # 50% has its own inline analysis: a blocking AnalysisRun with the same template and metrics, so the bad-model
+    # gate runs at 50% too (16-mlops §6: "AnalysisTemplate passes within 30 minutes" per step). count*interval
+    # below = 30 minutes. Any metric violation fails the run and rolls the Rollout back automatically.
+    - analysis:
+        templates:
+          - templateName: ml     # fullnameOverride=ml, set by clusters/prod/services.yaml
+        args:
+          - name: canary-hash
+            valueFrom: { podTemplateHashValue: Latest }
+          - name: stable-hash
+            valueFrom: { podTemplateHashValue: Stable }
+    - pause: {}                  # manual promotion gate before 100% (autoPromote=false)
+    - setWeight: 100
   analysis:
     enabled: true
     compareCanaryStable: true   # requires the canary-hash/stable-hash args in the microservice chart (MLO-03, templates PR #6)
