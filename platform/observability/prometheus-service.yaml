@@ -1,0 +1,19 @@
+# Stable in-cluster endpoint for the Prometheus created by kube-prometheus-stack.
+# The already-merged ML canary AnalysisTemplate (MLO-03) queries http://prometheus.monitoring:9090;
+# kube-prometheus-stack names its own Service <release>-prometheus, so this keeps the agreed address.
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+    operator.prometheus.io/name: kube-prometheus-stack-prometheus
+  ports:
+    - name: http-web
+      port: 9090
+      targetPort: http-web

@@ -4,6 +4,10 @@ env:
   SHP_OTLP_EXPORT: "true"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector.observability:4318
   SHP_CLINICAL_URL: http://clinical
+  # RED metrics (OBS-01) and the SLO boundaries (OBS-02): Micrometer publishes the latency histogram,
+  # and the exact 300 ms / 800 ms buckets that platform/observability/rules/red-slo.yaml uses.
+  # Spring Boot reads SPRING_APPLICATION_JSON; non-Java services ignore it.
+  SPRING_APPLICATION_JSON: '{"management":{"metrics":{"distribution":{"percentiles-histogram":{"http.server.requests":true},"slo":{"http.server.requests":"300ms,800ms"}}}}}'
 networkPolicy:
   enabled: true
   # Ingress: only from pods in the same namespace (gateway -> service, service -> service on /internal).

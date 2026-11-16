@@ -17,6 +17,9 @@ spec:
           - { name: keda, repoURL: "https://kedacore.github.io/charts", chart: keda, version: "2.20.2", namespace: keda, wave: "-3" }
           - { name: envoy-gateway, repoURL: "docker.io/envoyproxy", chart: gateway-helm, version: "1.9.3", namespace: envoy-gateway-system, wave: "-3" }
           - { name: opentelemetry-collector, repoURL: "https://open-telemetry.github.io/opentelemetry-helm-charts", chart: opentelemetry-collector, version: "0.177.0", namespace: observability, wave: "-3" }
+          # Prometheus + Alertmanager for RED/SLO/platform alerts (OBS-01..03). Grafana stays disabled:
+          # dashboards go to Azure Managed Grafana (IAC-06) or the local Grafana.
+          - { name: kube-prometheus-stack, repoURL: "https://prometheus-community.github.io/helm-charts", chart: kube-prometheus-stack, version: "92.16.2", namespace: monitoring, wave: "-3" }
   template:
     metadata:
       name: "{{ .name }}"
@@ -67,3 +70,27 @@ spec:
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the add-on CRDs to be ready
+---
+# Dashboards and Prometheus rules owned by OBS-01..03. Applied after kube-prometheus-stack so the
+# PrometheusRule CRD exists (sync-wave -3) and before the services (wave 0).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
+    targetRevision: main
+    path: platform/observability
+    directory: { recurse: true }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+    retry: { limit: 5, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }
