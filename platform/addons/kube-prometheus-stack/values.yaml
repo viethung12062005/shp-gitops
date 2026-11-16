@@ -169,6 +169,11 @@ prometheus:
             replacement: /metrics
           - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
             target_label: service
+          # Argo Rollouts labels every pod with rollouts-pod-template-hash. The ml canary AnalysisTemplate
+          # (envs/<env>/ml/values.yaml) selects canary and stable series by this label; without it every
+          # query returns an empty result and the canary analysis cannot judge the new version (MLO-03).
+          - source_labels: [__meta_kubernetes_pod_label_rollouts_pod_template_hash]
+            target_label: rollouts_pod_template_hash
           - source_labels: [__meta_kubernetes_namespace]
             target_label: namespace
           - source_labels: [__meta_kubernetes_pod_name]
