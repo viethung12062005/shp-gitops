@@ -18,3 +18,38 @@ env:
 resources:
   requests: { cpu: 100m, memory: 384Mi }
   limits: { memory: 768Mi }   # JVM: -XX:MaxRAMPercentage=75
+# Scale out BEFORE booking opens at 07:00 Asia/Ho_Chi_Minh (PRD-11, NFR-S1) instead of reacting to the surge.
+# Source of the numbers (smart-hospital-platform: docs/02-requirements/workload-analysis.md §2 and §4,
+# non-functional-requirements.md NFR-S1/NFR-P1/NFR-P2):
+#   - slots open at 07:00 daily: 5,000 concurrent patients, find-slots 500 RPS for 5 minutes, booking 50 RPS for 2 minutes;
+#   - NFR-S1 allows 2 minutes to reach sufficient capacity; a CPU-only autoscaler needs the load to arrive first and then
+#     a JVM start per pod, so the schedule puts the capacity in place and CPU only handles what the schedule did not foresee.
+# The chart renders ONE KEDA ScaledObject and suppresses its plain HPA when keda.enabled is true, so the "HPA" part of the
+# task is the cpu trigger below: KEDA creates the HPA and uses the highest replica count any trigger asks for.
+keda:
+  enabled: true
+  # Off-peak floor. 2 = the prod replicaCount in envs/prod/services.yaml (one pod can be drained without an outage).
+  minReplicaCount: 2
+  # Ceiling for the cpu trigger: 6 scheduled pods plus 4 of headroom for a surge above the 1x figures. The 5x scenario
+  # (2,500 RPS) is not meant to be absorbed by pods alone: workload-analysis.md §4 names the Redis slot cache and a read
+  # replica for it.
+  maxReplicaCount: 10
+  triggers:
+    # 06:45-07:30 local time, every day. Start 15 minutes early: time for the cluster autoscaler to add a node, the image
+    # pull and the JVM warm-up before the first request. End at 07:30: the surge lasts 5 minutes; the remaining time lets
+    # the backlog of patients who retried drain, after which the cpu trigger alone decides.
+    # desiredReplicas 6: 550 RPS at the peak (500 find-slots + 50 booking) at an ASSUMED ~100 RPS per pod, plus one spare
+    # pod. The per-pod figure is a planning assumption, not a measurement: correct it from the k6 run that NFR-S1 and
+    # NFR-P1 prescribe (500 RPS on prod-sized uat) and change both environments together.
+    - type: cron
+      metadata:
+        timezone: Asia/Ho_Chi_Minh
+        start: 45 6 * * *
+        end: 30 7 * * *
+        desiredReplicas: "6"
+    # Reactive part (the task's HPA): same 70% CPU target as the chart's autoscaling default. Utilization is measured
+    # against resources.requests.cpu above.
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
