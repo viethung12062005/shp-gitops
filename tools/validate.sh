@@ -36,6 +36,12 @@ for env in uat prod; do
     --set image.repository=acrshpci.azurecr.io/mlflow --set image.digest="sha256:$(printf '0%.0s' {1..64})" \
     --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000 --set database.host=psql-ci.postgres.database.azure.com \
     --set database.user=id-ci-mlflow --set artifacts.storageAccount=stci > "$OUT/mlflow-$env.yaml" || { echo "  render failed: $env/mlflow"; fail=1; }
+  helm template ml-retrain platform/charts/ml-retrain -f "envs/$env/addons/ml-retrain.yaml" \
+    --set image.repository=acrshpci.azurecr.io/ml-train --set image.digest="sha256:$(printf '0%.0s' {1..64})" > "$OUT/ml-retrain-$env.yaml" \
+    || { echo "  render failed: $env/ml-retrain"; fail=1; }
+  # Without a digest the chart must render nothing (no CronJob that cannot pull an image).
+  [ -z "$(helm template ml-retrain platform/charts/ml-retrain -f "envs/$env/addons/ml-retrain.yaml" | grep -vE '^(#|---|\s*$)')" ] \
+    || { echo "  ml-retrain renders objects without an image digest ($env)"; fail=1; }
   for d in envs/$env/*/; do
     svc=$(basename "$d"); [ "$svc" = addons ] && continue
     helm template "$svc" "$CHART" -f envs/services-common.yaml -f "envs/$env/services.yaml" -f "$d/values.yaml" \
@@ -43,6 +49,29 @@ for env in uat prod; do
       --set image.digest="sha256:$(printf '0%.0s' {1..64})" --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000       > "$OUT/$env-$svc.yaml" || { echo "  render failed: $env/$svc"; fail=1; }
   done
 done
+echo "== 3b. Retraining cannot overlap (rendered CronJob)"
+python3 -I - "$OUT" <<'PY' || fail=1
+import glob, sys, yaml
+bad = 0
+for f in sorted(glob.glob(sys.argv[1] + "/ml-retrain-*.yaml")):
+    docs = [d for d in yaml.safe_load_all(open(f)) if d]
+    cj = [d for d in docs if d["kind"] == "CronJob"]
+    if len(cj) != 1: print("  ", f, "expected exactly one CronJob"); bad += 1; continue
+    s = cj[0]["spec"]; job = s["jobTemplate"]["spec"]; c = job["template"]["spec"]["containers"][0]
+    checks = {
+        "concurrencyPolicy is Forbid": s["concurrencyPolicy"] == "Forbid",
+        "not suspended": s["suspend"] is False,
+        "backoffLimit is 0 (a failed run is not retried behind its back)": job["backoffLimit"] == 0,
+        "activeDeadlineSeconds is below the 7200 s lock lease": 0 < job["activeDeadlineSeconds"] < 7200,
+        "restartPolicy is Never": job["template"]["spec"]["restartPolicy"] == "Never",
+        "runs python -m shp_ml.retrain": c["command"][:3] == ["python", "-m", "shp_ml.retrain"],
+        "image is pinned by digest": "@sha256:" in c["image"],
+        "no literal MONGODB_URI": all(e["name"] != "MONGODB_URI" or "valueFrom" in e for e in c["env"]),
+    }
+    for name, ok in checks.items():
+        if not ok: print("  ", f, "FAILED:", name); bad += 1
+sys.exit(1 if bad else 0)
+PY
 kubeconform -strict -summary "${SCHEMAS[@]}" "$OUT"/*.yaml clusters/*/*.yaml bootstrap/root-*.yaml || fail=1
 
 echo "== 4. Required placeholders still empty"

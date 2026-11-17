@@ -8,6 +8,8 @@ policies:
   # The keyless cosign signing identity is the container.yml reusable workflow of the templates repo.
   signerSubject: "https://github.com/viethung12062005/shp-platform-templates/.github/workflows/container.yml@*"
   signerIssuer: https://token.actions.githubusercontent.com
+  # Pods of these apps are exempt from the readiness/liveness rule only: they are batch jobs with no port to probe.
+  probeExemptApps: [ml-retrain]
 gateway:
   enabled: true
   hostname: ""              # e.g. api.uat.<domain>; when empty the Gateway only has an HTTP listener (no TLS)

@@ -24,6 +24,7 @@ flowchart LR
 | `clusters/<env>/services.yaml` | Service ApplicationSet: every `envs/<env>/<svc>/values.yaml` that **has a digest** becomes one Application | SA |
 | `platform/addons/<name>/values.yaml` | Add-on values; per-environment overrides live in `envs/<env>/addons/<name>.yaml` | SA |
 | `platform/charts/mlflow/`, `envs/<env>/addons/mlflow.yaml` | MLflow tracking + model registry in namespace `shp-deps` (GOP-10): PostgreSQL backend store, artifacts on the Blob `mlops` container, both through Workload Identity (no password or key); NetworkPolicy limits callers to `shp-apps` | SA |
+| `platform/charts/ml-retrain/`, `envs/<env>/addons/ml-retrain.yaml` | CronJob (`concurrencyPolicy: Forbid`, no retries) that runs `python -m shp_ml.retrain` in `shp-apps` (MLO-04); renders nothing until the training image digest is set | SA |
 | `platform/charts/shp-baseline/` | Namespace at PSA restricted, default-deny NetworkPolicy, 4 Kyverno policies (ACR only, cosign signature, no `:latest`, resources/probes required), Gateway + Let's Encrypt | SA |
 | `envs/services-common.yaml`, `envs/<env>/services.yaml` | Values shared by every service (OTLP, OIDC, replica count) | SA |
 | `envs/<env>/<svc>/values.yaml` | Per-service values; **`image.digest` is written by the pipeline, never edited by hand** | pipeline / SA |
