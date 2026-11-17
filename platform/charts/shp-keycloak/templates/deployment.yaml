@@ -60,6 +60,8 @@ spec:
             - --cache-stack=kubernetes
           env:
             - { name: SHP_PUBLIC_HOST, value: {{ $h | quote }} }
+            # Cluster realm placeholder ${SHP_K8S_OIDC_ISSUER}: identity provider `kubernetes` (service-account client authentication)
+            - { name: SHP_K8S_OIDC_ISSUER, value: {{ required "kubernetesClientAuth.issuer is required (AKS oidc_issuer_url)" .Values.kubernetesClientAuth.issuer | quote }} }
             - { name: JAVA_OPTS_KC_HEAP, value: {{ .Values.jvm.heap | quote }} }
             # DNS_PING over the headless Service
             - { name: JAVA_OPTS_APPEND, value: "-Djgroups.dns.query=keycloak-headless.{{ .Values.namespace }}.svc.cluster.local" }

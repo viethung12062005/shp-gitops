@@ -35,6 +35,9 @@ secret:
 
 # Kubernetes service-account client authentication (IAM-02): Keycloak fetches the cluster's OIDC discovery/JWKS over HTTPS.
 kubernetesClientAuth:
+  # Issuer URL of the cluster's service-account tokens (the `iss` claim): for AKS the `oidc_issuer_url` of the cluster
+  # (shp-infra, IAC-02/IAC-16 input). Keycloak fetches <issuer>/.well-known/openid-configuration and the keys from it.
+  issuer: ""
   egress: true                   # allow outbound 443 for that fetch (AKS OIDC issuer is public)
 
 realm:

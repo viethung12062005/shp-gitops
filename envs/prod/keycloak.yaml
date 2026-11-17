@@ -11,3 +11,5 @@ workloadIdentity:
 keyVault:
   name: ""                  # keycloak_values.keyVault.name
   tenantId: ""              # keycloak_values.keyVault.tenantId
+kubernetesClientAuth:
+  issuer: ""                # OIDC issuer URL of the AKS cluster (iss claim of ServiceAccount tokens), IAC cluster output oidc_issuer_url

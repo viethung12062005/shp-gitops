@@ -26,6 +26,26 @@
       {
         "name": "dpo",
         "description": "Data protection officer"
+      },
+      {
+        "name": "internal.clinical",
+        "description": "May call /internal of clinical"
+      },
+      {
+        "name": "internal.document",
+        "description": "May call /internal of document"
+      },
+      {
+        "name": "internal.ml",
+        "description": "May call /internal of ml"
+      },
+      {
+        "name": "internal.notification",
+        "description": "May call /internal of notification"
+      },
+      {
+        "name": "internal.scheduling",
+        "description": "May call /internal of scheduling"
       }
     ]
   },
@@ -84,6 +104,364 @@
       "enabled": true,
       "bearerOnly": true,
       "protocolMappers": []
+    },
+    {
+      "clientId": "svc-clinical",
+      "name": "Service account of clinical (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:clinical"
+      },
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "shp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-document",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "document",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-scheduling",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "scheduling",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-notification",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "notification",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "svc-scheduling",
+      "name": "Service account of scheduling (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:scheduling"
+      },
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "shp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-clinical",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "clinical",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-ml",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "ml",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "svc-notification",
+      "name": "Service account of notification (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:notification"
+      },
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "shp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-clinical",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "clinical",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "svc-document",
+      "name": "Service account of document (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:document"
+      },
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "shp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-clinical",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "clinical",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "svc-ai",
+      "name": "Service account of ai (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:ai"
+      },
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "shp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-clinical",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "clinical",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-document",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "document",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "svc-ml",
+      "name": "Service account of ml (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:ml"
+      },
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "shp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-scheduling",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "scheduling",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "otpPolicyType": "totp",
@@ -91,5 +469,70 @@
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "otpPolicyInitialCounter": 0,
-  "sslRequired": "external"
+  "sslRequired": "external",
+  "identityProviders": [
+    {
+      "alias": "kubernetes",
+      "providerId": "kubernetes",
+      "enabled": true,
+      "hideOnLogin": true,
+      "config": {
+        "issuer": "${SHP_K8S_OIDC_ISSUER}"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-svc-clinical",
+      "enabled": true,
+      "serviceAccountClientId": "svc-clinical",
+      "realmRoles": [
+        "internal.document",
+        "internal.scheduling",
+        "internal.notification"
+      ]
+    },
+    {
+      "username": "service-account-svc-scheduling",
+      "enabled": true,
+      "serviceAccountClientId": "svc-scheduling",
+      "realmRoles": [
+        "internal.clinical",
+        "internal.ml"
+      ]
+    },
+    {
+      "username": "service-account-svc-notification",
+      "enabled": true,
+      "serviceAccountClientId": "svc-notification",
+      "realmRoles": [
+        "internal.clinical"
+      ]
+    },
+    {
+      "username": "service-account-svc-document",
+      "enabled": true,
+      "serviceAccountClientId": "svc-document",
+      "realmRoles": [
+        "internal.clinical"
+      ]
+    },
+    {
+      "username": "service-account-svc-ai",
+      "enabled": true,
+      "serviceAccountClientId": "svc-ai",
+      "realmRoles": [
+        "internal.clinical",
+        "internal.document"
+      ]
+    },
+    {
+      "username": "service-account-svc-ml",
+      "enabled": true,
+      "serviceAccountClientId": "svc-ml",
+      "realmRoles": [
+        "internal.scheduling"
+      ]
+    }
+  ]
 }

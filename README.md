@@ -41,7 +41,7 @@ Fill in the fields that are still empty. None of them is a secret; the values co
 - `envs/<env>/platform.yaml`: `acrLoginServer`, `gateway.hostname`, `gateway.acmeEmail`.
 - `envs/<env>/services.yaml`: `OIDC_AUTHORITY`, `OIDC_AUDIENCE`.
 - `envs/<env>/<svc>/values.yaml`: `image.repository` = `<acrLoginServer>/<svc>`.
-- `envs/<env>/keycloak.yaml` (IAM-01): `hostname` (= `gateway.hostname`), `database.host`, `workloadIdentity.clientId`, `keyVault.name`, `keyVault.tenantId`; all are in `terraform output keycloak_values` (IAC-16). The Key Vault secrets `keycloak-db-password` and `keycloak-admin-password` are created by Terraform and mounted by the Secrets Store CSI driver; they never appear here.
+- `envs/<env>/keycloak.yaml` (IAM-01): `hostname` (= `gateway.hostname`), `database.host`, `workloadIdentity.clientId`, `keyVault.name`, `keyVault.tenantId`, `kubernetesClientAuth.issuer` (the AKS OIDC issuer URL); all but the last are in `terraform output keycloak_values` (IAC-16). The Key Vault secrets `keycloak-db-password` and `keycloak-admin-password` are created by Terraform and mounted by the Secrets Store CSI driver; they never appear here.
 
 Check with `tools/validate.sh --strict` (it fails while a field is empty). Secrets, including Argo CD's repo read credential and the
 Application Insights connection string, are created by ENV-01 directly inside the cluster from Key Vault. **Never commit a secret to this repo.**

@@ -34,7 +34,7 @@ for env in uat prod; do
     > "$OUT/baseline-$env.yaml"
   helm template keycloak platform/charts/shp-keycloak -f "envs/$env/keycloak.yaml" \
     --set hostname=api.$env.example.org --set database.host=db.example.org --set keyVault.name=kv-ci \
-    --set keyVault.tenantId=00000000-0000-0000-0000-000000000000 --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000 \
+    --set kubernetesClientAuth.issuer=https://oidc.example.org/ci --set keyVault.tenantId=00000000-0000-0000-0000-000000000000 --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000 \
     > "$OUT/keycloak-$env.yaml" || { echo "  render failed: keycloak $env"; fail=1; }
   for d in envs/$env/*/; do
     svc=$(basename "$d"); [ "$svc" = addons ] && continue
@@ -52,7 +52,7 @@ path = "platform/charts/shp-keycloak/files/realm-shp.json"
 text = open(path, encoding="utf-8").read()
 realm = json.loads(text)
 problems = [t for t in ("localhost", "shp-test") if t in text]
-if realm.get("users"): problems.append("users")
+if any("serviceAccountClientId" not in u or "credentials" in u for u in realm.get("users", [])): problems.append("person users or credentials")
 if "credentials" in text: problems.append("credentials")
 if realm.get("realm") != "shp": problems.append("realm name")
 print("  " + (", ".join(problems) if problems else "ok"))
@@ -62,7 +62,7 @@ PY
 if [ -n "${APP_DIR:-}" ]; then python3 -I "$APP_DIR/tools/identity/realm.py" --check --gitops . || fail=1; else echo "  (APP_DIR not set: drift against the application repo not checked)"; fi
 
 echo "== 4. Required placeholders still empty"
-empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME|host|tenantId|name): ""' envs || true)
+empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME|host|tenantId|name|issuer): ""' envs || true)
 # Web app runtime config (JSON inside envs/<env>/web/values.yaml): login server and SPA client ID.
 web_empty=$(grep -rnE '"(authority|clientId)": ""' envs || true)
 empty=$(printf '%s\n%s\n' "$empty" "$web_empty" | sed '/^$/d')
