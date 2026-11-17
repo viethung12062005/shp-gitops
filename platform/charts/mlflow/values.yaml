@@ -1,0 +1,54 @@
+# MLflow 2.17.x (the ml service pins mlflow-skinny >=2.17,<3). Per-environment values: envs/<env>/addons/mlflow.yaml.
+# Fields marked FILL IN come from Terraform outputs; none of them is a secret (tools/validate.sh --strict fails while they are empty).
+namespace: shp-deps          # same DNS name as the local profile: http://mlflow.shp-deps:5000
+
+# Server image. The upstream ghcr.io/mlflow/mlflow:v2.17.2 has neither a PostgreSQL driver nor the Azure SDK, so the
+# environment uses its own build pushed to ACR and pinned by digest:
+#   FROM ghcr.io/mlflow/mlflow:v2.17.2@sha256:<digest>
+#   RUN pip install --no-cache-dir psycopg2-binary==2.9.10 azure-storage-blob==12.24.0 azure-identity==1.19.0
+#   USER 10001
+# TODO (follow-up task): pipeline that builds, scans and signs this image. `tag` is for local tests only.
+image:
+  repository: ""            # FILL IN: <acrLoginServer>/mlflow
+  digest: ""                # FILL IN: sha256:...
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+workers: 2                  # gunicorn workers per pod
+resources:
+  requests: { cpu: 100m, memory: 384Mi }
+  limits: { memory: 1Gi }
+pdb: { enabled: false }
+
+# Azure Workload Identity: the User-Assigned Managed Identity of MLflow (one per service, IAC-15).
+# It needs (a) an Entra role in the PostgreSQL server that owns database `database.name`, and
+# (b) Storage Blob Data Contributor on the `mlops` container. No password or key exists anywhere.
+workloadIdentity:
+  clientId: ""              # FILL IN: client_id of the mlflow identity
+
+database:
+  host: ""                  # FILL IN: <server>.postgres.database.azure.com (private endpoint, VNet only)
+  port: 5432
+  name: mlflow
+  user: ""                  # FILL IN: name of the Entra principal in PostgreSQL (the identity name)
+  sslmode: require
+  # Entra tokens are used as the PostgreSQL password. A short-lived token is written to a libpq passfile by an init
+  # container and refreshed by a sidecar, so connections opened after a token expires still authenticate.
+  entraAuth:
+    enabled: true
+    refreshSeconds: 1200
+    scope: https://ossrdbms-aad.database.windows.net/.default
+  poolRecycleSeconds: 1800  # SQLAlchemy recycles connections well before the token (about 60-90 min) expires
+
+artifacts:
+  storageAccount: ""        # FILL IN: documents storage account name (container `mlops`)
+  container: mlops
+  prefix: mlflow
+  destination: ""           # tests only: overrides the wasbs:// URL built from the three fields above
+
+networkPolicy:
+  defaultDenyIngress: true
+  clientNamespaces: [shp-apps]   # namespaces allowed to call the server (ml service, training/retraining jobs)
+  privateCidr: 10.0.0.0/8        # VNet: PostgreSQL and Blob private endpoints
+  entraEgressCidr: 0.0.0.0/0     # Microsoft Entra ID token endpoint (public, 443 only), needed by Workload Identity

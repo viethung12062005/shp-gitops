@@ -1,0 +1,48 @@
+{{- $ns := .Values.namespace }}
+{{- if .Values.networkPolicy.defaultDenyIngress }}
+# Same stance as the baseline in shp-apps (GOP-08): nothing reaches a pod unless a policy opens it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ $ns }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mlflow
+  namespace: {{ $ns }}
+  labels: {{- include "mlflow.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "mlflow.selector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Only the namespaces that train or serve models (ml service, retraining and training jobs).
+    - from:
+        {{- range .Values.networkPolicy.clientNamespaces }}
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ . }} } }
+        {{- end }}
+      ports:
+        - { port: 5000, protocol: TCP }
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    # PostgreSQL and Blob private endpoints are inside the VNet.
+    - to:
+        - ipBlock: { cidr: {{ .Values.networkPolicy.privateCidr }} }
+      ports:
+        - { port: 5432, protocol: TCP }
+        - { port: 443, protocol: TCP }
+    # Workload Identity exchanges the pod token at the Microsoft Entra ID endpoint, which is public (443 only).
+    - to:
+        - ipBlock: { cidr: {{ .Values.networkPolicy.entraEgressCidr }} }
+      ports:
+        - { port: 443, protocol: TCP }

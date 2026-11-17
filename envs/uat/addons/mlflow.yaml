@@ -1,0 +1,12 @@
+# Values of platform/charts/mlflow for uat. FILL IN before provisioning (Terraform outputs; none is a secret).
+image:
+  repository: ""            # <acrLoginServer>/mlflow
+  digest: ""
+workloadIdentity:
+  clientId: ""              # client_id of the mlflow identity (IAC-15)
+database:
+  host: ""                  # PostgreSQL Flexible Server FQDN (IAC-09)
+  user: ""                  # Entra principal name of the mlflow identity
+artifacts:
+  storageAccount: ""        # documents storage account (IAC-12), container mlops
+replicaCount: 1

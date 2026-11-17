@@ -1,0 +1,100 @@
+{{- $db := .Values.database }}
+{{- $entra := $db.entraAuth.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "mlflow.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: {{- include "mlflow.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mlflow.selector" . | nindent 8 }}
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: mlflow
+      automountServiceAccountToken: false   # the Workload Identity webhook projects its own token
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      {{- if $entra }}
+      initContainers:
+        - name: pgpass-init
+          image: {{ include "mlflow.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "/scripts/refresh.py", "--once"]
+          env: {{- include "mlflow.pgenv" . | nindent 12 }}
+          securityContext: {{- include "mlflow.containerSecurity" . | nindent 12 }}
+          resources: { requests: { cpu: 10m, memory: 64Mi }, limits: { memory: 256Mi } }
+          volumeMounts:
+            - { name: pg, mountPath: /run/pg }
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      {{- end }}
+      containers:
+        - name: mlflow
+          image: {{ include "mlflow.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # --serve-artifacts: clients upload artifacts THROUGH the server, so only this pod needs Blob access.
+          command:
+            - mlflow
+            - server
+            - --host=0.0.0.0
+            - --port=5000
+            - --workers={{ .Values.workers }}
+            - --backend-store-uri=postgresql://$(PGUSER)@$(PGHOST):$(PGPORT)/$(PGDATABASE)?sslmode={{ $db.sslmode }}
+            - --artifacts-destination={{ include "mlflow.artifactsDestination" . }}
+            - --serve-artifacts
+          env:
+            {{- include "mlflow.pgenv" . | nindent 12 }}
+            - { name: MLFLOW_SQLALCHEMYSTORE_POOL_RECYCLE, value: {{ $db.poolRecycleSeconds | quote }} }
+          ports:
+            - { name: http, containerPort: 5000 }
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext: {{- include "mlflow.containerSecurity" . | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if $entra }}
+            - { name: pg, mountPath: /run/pg, readOnly: true }
+            {{- end }}
+        {{- if $entra }}
+        - name: pgpass-refresh
+          image: {{ include "mlflow.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "/scripts/refresh.py"]
+          env: {{- include "mlflow.pgenv" . | nindent 12 }}
+          securityContext: {{- include "mlflow.containerSecurity" . | nindent 12 }}
+          resources: { requests: { cpu: 10m, memory: 64Mi }, limits: { memory: 256Mi } }
+          volumeMounts:
+            - { name: pg, mountPath: /run/pg }
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+        {{- end }}
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        {{- if $entra }}
+        - { name: pg, emptyDir: { medium: Memory } }
+        - name: scripts
+          configMap: { name: mlflow-pgpass-refresh }
+        {{- end }}
