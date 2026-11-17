@@ -71,6 +71,31 @@ spec:
     automated: { prune: true, selfHeal: true }
     retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the add-on CRDs to be ready
 ---
+# Keycloak, the identity provider (ADR-0017, IAM-01): namespace shp-iam, realm `shp` imported from code, /idp route on the shared Gateway.
+# Wave -1: after shp-baseline (Gateway, CRDs) and before the services that validate its tokens.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
+    targetRevision: main
+    path: platform/charts/shp-keycloak
+    helm:
+      valueFiles: [../../../envs/uat/keycloak.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shp-iam
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the Gateway API and Secrets Store CRDs
+---
 # Dashboards and Prometheus rules owned by OBS-01..03. Applied after kube-prometheus-stack so the
 # PrometheusRule CRD exists (sync-wave -3) and before the services (wave 0).
 apiVersion: argoproj.io/v1alpha1

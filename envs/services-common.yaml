@@ -4,6 +4,10 @@ env:
   SHP_OTLP_EXPORT: "true"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://opentelemetry-collector.observability:4318
   SHP_CLINICAL_URL: http://clinical
+  # Signing keys are fetched inside the cluster (the public issuer URL is not reachable from a pod under default-deny egress).
+  # OIDC_AUTHORITY (the public /idp issuer) is per environment in envs/<env>/services.yaml.
+  OIDC_JWK_SET_URI: http://keycloak.shp-iam.svc.cluster.local:8080/idp/realms/shp/protocol/openid-connect/certs
+  SHP_AUTH_JWK_SET_URI: http://keycloak.shp-iam.svc.cluster.local:8080/idp/realms/shp/protocol/openid-connect/certs
   # RED metrics (OBS-01) and the SLO boundaries (OBS-02): Micrometer publishes the latency histogram,
   # and the exact 300 ms / 800 ms buckets that platform/observability/rules/red-slo.yaml uses.
   # Spring Boot reads SPRING_APPLICATION_JSON; non-Java services ignore it.
@@ -38,6 +42,11 @@ networkPolicy:
         - { port: 10001, protocol: TCP }
         - { port: 9200, protocol: TCP }
         - { port: 5000, protocol: TCP }
+    # Keycloak (shp-iam): token signing keys only (JWKS). Keycloak's NetworkPolicy admits shp-apps on 8080 and nothing else.
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: shp-iam } }
+      ports:
+        - { port: 8080, protocol: TCP }
     # Private endpoints and in-VNet Azure services (Service Bus, Key Vault, Blob, AI Search, Monitor) all sit in the
     # VNet; 10/8 covers the cluster and private-endpoint subnets without naming each CIDR here.
     - to:

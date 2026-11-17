@@ -1,0 +1,12 @@
+# The `shp` realm as code. Keycloak imports it (--import-realm) when the realm does not exist yet, so an empty database
+# is rebuilt to this state. ${SHP_PUBLIC_HOST} is replaced from the pod environment at import time.
+# Source: application repo identity/realm/ (tools/identity/realm.py); this copy is checked against it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+data:
+  realm-shp.json: |
+{{ .Files.Get .Values.realm.importFile | indent 4 }}

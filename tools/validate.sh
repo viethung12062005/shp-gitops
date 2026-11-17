@@ -32,6 +32,10 @@ for env in uat prod; do
   helm template shp-baseline platform/charts/shp-baseline -f "envs/$env/platform.yaml" \
     --set acrLoginServer=acrshpci.azurecr.io --set gateway.hostname=api.$env.example.org --set gateway.acmeEmail=ci@example.org \
     > "$OUT/baseline-$env.yaml"
+  helm template keycloak platform/charts/shp-keycloak -f "envs/$env/keycloak.yaml" \
+    --set hostname=api.$env.example.org --set database.host=db.example.org --set keyVault.name=kv-ci \
+    --set keyVault.tenantId=00000000-0000-0000-0000-000000000000 --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000 \
+    > "$OUT/keycloak-$env.yaml" || { echo "  render failed: keycloak $env"; fail=1; }
   for d in envs/$env/*/; do
     svc=$(basename "$d"); [ "$svc" = addons ] && continue
     helm template "$svc" "$CHART" -f envs/services-common.yaml -f "envs/$env/services.yaml" -f "$d/values.yaml" \
@@ -41,8 +45,24 @@ for env in uat prod; do
 done
 kubeconform -strict -summary "${SCHEMAS[@]}" "$OUT"/*.yaml clusters/*/*.yaml bootstrap/root-*.yaml || fail=1
 
+echo "== 3b. Keycloak realm copy (IAM-01): production content only, same as the application repo's source"
+python3 -I - <<'PY' || fail=1
+import json, sys
+path = "platform/charts/shp-keycloak/files/realm-shp.json"
+text = open(path, encoding="utf-8").read()
+realm = json.loads(text)
+problems = [t for t in ("localhost", "shp-test") if t in text]
+if realm.get("users"): problems.append("users")
+if "credentials" in text: problems.append("credentials")
+if realm.get("realm") != "shp": problems.append("realm name")
+print("  " + (", ".join(problems) if problems else "ok"))
+sys.exit(1 if problems else 0)
+PY
+# Optional: APP_DIR = checkout of smart-hospital-platform; compares the copy with the generated prod realm (no drift).
+if [ -n "${APP_DIR:-}" ]; then python3 -I "$APP_DIR/tools/identity/realm.py" --check --gitops . || fail=1; else echo "  (APP_DIR not set: drift against the application repo not checked)"; fi
+
 echo "== 4. Required placeholders still empty"
-empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME): ""' envs || true)
+empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME|host|tenantId|name): ""' envs || true)
 # Web app runtime config (JSON inside envs/<env>/web/values.yaml): login server and SPA client ID.
 web_empty=$(grep -rnE '"(authority|clientId)": ""' envs || true)
 empty=$(printf '%s\n%s\n' "$empty" "$web_empty" | sed '/^$/d')

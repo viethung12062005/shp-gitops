@@ -1,0 +1,7 @@
+apiVersion: v2
+name: shp-keycloak
+description: Keycloak, the identity provider of the Smart Hospital Platform (ADR-0017, IAM-01). Realm `shp` is imported from files/realm-shp.json.
+type: application
+version: 0.1.0
+# The Keycloak version is the image tag + digest in values.yaml, not appVersion.
+appVersion: "26.8.2"

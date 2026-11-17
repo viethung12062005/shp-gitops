@@ -23,6 +23,7 @@ flowchart LR
 | `clusters/<env>/platform.yaml` | ApplicationSet for add-ons (pinned chart version) + the `shp-baseline` Application | SA |
 | `clusters/<env>/services.yaml` | Service ApplicationSet: every `envs/<env>/<svc>/values.yaml` that **has a digest** becomes one Application | SA |
 | `platform/addons/<name>/values.yaml` | Add-on values; per-environment overrides live in `envs/<env>/addons/<name>.yaml` | SA |
+| `platform/charts/shp-keycloak/` | Keycloak (ADR-0017, IAM-01): namespace `shp-iam` (PSA restricted, default-deny NetworkPolicy), 2 replicas in prod, realm `shp` imported from `files/realm-shp.json`, `/idp` HTTPRoute + ReferenceGrant. Values: `envs/<env>/keycloak.yaml` | SA |
 | `platform/charts/shp-baseline/` | Namespace at PSA restricted, default-deny NetworkPolicy, 4 Kyverno policies (ACR only, cosign signature, no `:latest`, resources/probes required), Gateway + Let's Encrypt | SA |
 | `envs/services-common.yaml`, `envs/<env>/services.yaml` | Values shared by every service (OTLP, OIDC, replica count) | SA |
 | `envs/<env>/<svc>/values.yaml` | Per-service values; **`image.digest` is written by the pipeline, never edited by hand** | pipeline / SA |
@@ -40,9 +41,14 @@ Fill in the fields that are still empty. None of them is a secret; the values co
 - `envs/<env>/platform.yaml`: `acrLoginServer`, `gateway.hostname`, `gateway.acmeEmail`.
 - `envs/<env>/services.yaml`: `OIDC_AUTHORITY`, `OIDC_AUDIENCE`.
 - `envs/<env>/<svc>/values.yaml`: `image.repository` = `<acrLoginServer>/<svc>`.
+- `envs/<env>/keycloak.yaml` (IAM-01): `hostname` (= `gateway.hostname`), `database.host`, `workloadIdentity.clientId`, `keyVault.name`, `keyVault.tenantId`; all are in `terraform output keycloak_values` (IAC-16). The Key Vault secrets `keycloak-db-password` and `keycloak-admin-password` are created by Terraform and mounted by the Secrets Store CSI driver; they never appear here.
 
 Check with `tools/validate.sh --strict` (it fails while a field is empty). Secrets, including Argo CD's repo read credential and the
 Application Insights connection string, are created by ENV-01 directly inside the cluster from Key Vault. **Never commit a secret to this repo.**
+
+## Keycloak realm (IAM-01)
+`platform/charts/shp-keycloak/files/realm-shp.json` is a **copy** of `identity/realm/dist/realm-shp-prod.json` in the application repo, which `tools/identity/realm.py` builds from the same source as the local realm (so local and cluster cannot drift). Do not edit it here: change `identity/realm/` in the application repo, run the generator, and copy the file. `tools/validate.sh` always checks the copy for development content (users, `shp-test`, `localhost`, credentials); set `APP_DIR=<checkout of smart-hospital-platform>` to also compare it with the generated file.
+Keycloak imports the realm only when it does not exist yet (`--import-realm`), so a realm change reaches an environment whose database is new; for an existing database use the runbook in `docs/04-devops/keycloak.md` of the application repo.
 
 ## Local checks
 ```bash
