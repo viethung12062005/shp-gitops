@@ -61,6 +61,27 @@ PY
 # Optional: APP_DIR = checkout of smart-hospital-platform; compares the copy with the generated prod realm (no drift).
 if [ -n "${APP_DIR:-}" ]; then python3 -I "$APP_DIR/tools/identity/realm.py" --check --gitops . || fail=1; else echo "  (APP_DIR not set: drift against the application repo not checked)"; fi
 
+echo "== 3c. /idp route exposes the OIDC endpoints and never the admin console (IAM-06)"
+python3 -I - "$OUT" <<'PY' || fail=1
+import glob, sys, yaml
+bad = []
+for f in sorted(glob.glob(sys.argv[1] + "/keycloak-*.yaml")):
+    routes = [d for d in yaml.safe_load_all(open(f)) if d and d.get("kind") == "HTTPRoute" and d["metadata"]["name"] == "idp"]
+    if not routes:
+        bad.append(f"{f}: no HTTPRoute idp"); continue
+    matches = [m["path"] for r in routes[0]["spec"]["rules"] for m in r["matches"]]
+    def exposed(path):
+        return any(m["value"] == path if m["type"] == "Exact" else path == m["value"] or path.startswith(m["value"].rstrip("/") + "/") for m in matches)
+    for path in ("/idp/admin", "/idp/admin/realms/shp/users", "/idp/admin/master/console/", "/idp/realms/master", "/idp/realms/master/protocol/openid-connect/token",
+                 "/idp/realms/shp/clients-registrations/openid-connect", "/idp/health/ready", "/idp/metrics", "/idp/realms/shp/protocol/saml", "/idp"):
+        if exposed(path): bad.append(f"{f}: {path} is routed to Keycloak")
+    for path in ("/idp/realms/shp", "/idp/realms/shp/protocol/openid-connect/auth", "/idp/realms/shp/protocol/openid-connect/token",
+                 "/idp/realms/shp/.well-known/openid-configuration", "/idp/resources/abc/login/keycloak/css/login.css"):
+        if not exposed(path): bad.append(f"{f}: {path} is not routed (sign-in would break)")
+print("  " + ("\n  ".join(bad) if bad else "ok: admin console, master realm, client registration, health and metrics are not routed"))
+sys.exit(1 if bad else 0)
+PY
+
 echo "== 4. Required placeholders still empty"
 empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME|host|tenantId|name|issuer): ""' envs || true)
 # Web app runtime config (JSON inside envs/<env>/web/values.yaml): login server and SPA client ID.

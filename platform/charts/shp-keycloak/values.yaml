@@ -47,6 +47,9 @@ route:
   enabled: true                  # needs the Gateway API CRDs and the shp-gateway Gateway of shp-baseline
   gatewayName: shp-gateway
   tls: true                      # attach only to the https listener
+  # Per source address on the public /idp route (IAM-06): Keycloak locks a single account after 5 failures but cannot
+  # block an address, so Envoy limits requests per client IP. Needs the real client IP at the gateway (see keycloak.md).
+  rateLimit: { enabled: true, requestsPerMinute: 120 }
 
 networkPolicy:
   # Extra CIDRs that may reach Keycloak's port 8080 directly (an internal admin VPN/bastion range). Empty = nobody:

@@ -10,3 +10,16 @@ metadata:
 data:
   realm-shp.json: |
 {{ .Files.Get .Values.realm.importFile | indent 4 }}
+---
+# Password policy passwordBlacklist(breached-passwords.txt) reads this file from Keycloak's data directory (IAM-06).
+# The list in git is a short starter list; replace it with a larger breached-password list (ConfigMap content or a mounted
+# volume) before real users register. Source: application repo identity/realm/breached-passwords.txt.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-password-blacklist
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+data:
+  breached-passwords.txt: |
+{{ .Files.Get "files/breached-passwords.txt" | indent 4 }}

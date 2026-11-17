@@ -22,6 +22,7 @@ spec:
       annotations:
         # A realm change rolls the pods so the new import file is the one on disk.
         checksum/realm: {{ .Files.Get .Values.realm.importFile | sha256sum }}
+        checksum/blacklist: {{ .Files.Get "files/breached-passwords.txt" | sha256sum }}
     spec:
       serviceAccountName: keycloak
       automountServiceAccountToken: false
@@ -92,6 +93,7 @@ spec:
             capabilities: { drop: [ALL] }
           volumeMounts:
             - { name: realm, mountPath: /opt/keycloak/data/import, readOnly: true }
+            - { name: blacklist, mountPath: /opt/keycloak/data/password-blacklists, readOnly: true }
             - { name: tmp, mountPath: /tmp }
             {{- if .Values.secret.fromKeyVault }}
             - { name: secrets, mountPath: /mnt/secrets, readOnly: true }
@@ -99,6 +101,8 @@ spec:
       volumes:
         - name: realm
           configMap: { name: keycloak-realm }
+        - name: blacklist
+          configMap: { name: keycloak-password-blacklist }
         - name: tmp
           emptyDir: {}
         {{- if .Values.secret.fromKeyVault }}
