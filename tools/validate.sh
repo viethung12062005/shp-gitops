@@ -47,13 +47,14 @@ kubeconform -strict -summary "${SCHEMAS[@]}" "$OUT"/*.yaml clusters/*/*.yaml boo
 
 echo "== 3b. Keycloak realm copy (IAM-01): production content only, same as the application repo's source"
 python3 -I - <<'PY' || fail=1
-import json, sys
+import json, re, sys
 path = "platform/charts/shp-keycloak/files/realm-shp.json"
 text = open(path, encoding="utf-8").read()
 realm = json.loads(text)
 problems = [t for t in ("localhost", "shp-test") if t in text]
 if any("serviceAccountClientId" not in u or "credentials" in u for u in realm.get("users", [])): problems.append("person users or credentials")
-if "credentials" in text: problems.append("credentials")
+# a user credential list is forbidden; the stock flow config key "credentials": "<name>" (IAM-10) is not one
+if re.search(r'"credentials"\s*:\s*\[', text): problems.append("credentials")
 if realm.get("realm") != "shp": problems.append("realm name")
 print("  " + (", ".join(problems) if problems else "ok"))
 sys.exit(1 if problems else 0)
