@@ -40,6 +40,10 @@ database:
     refreshSeconds: 1200
     scope: https://ossrdbms-aad.database.windows.net/.default
   poolRecycleSeconds: 1800  # SQLAlchemy recycles connections well before the token (about 60-90 min) expires
+  # Connection budget: the server is shared with scheduling, and uat runs B_Standard_B1ms (50 connections, 15 reserved).
+  # Each gunicorn worker has its own pool, so one pod opens at most workers x (poolSize + maxOverflow) = 2 x 5 = 10.
+  poolSize: 2
+  maxOverflow: 3
 
 artifacts:
   storageAccount: ""        # FILL IN: documents storage account name (container `mlops`)

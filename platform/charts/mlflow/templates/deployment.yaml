@@ -55,6 +55,8 @@ spec:
           env:
             {{- include "mlflow.pgenv" . | nindent 12 }}
             - { name: MLFLOW_SQLALCHEMYSTORE_POOL_RECYCLE, value: {{ $db.poolRecycleSeconds | quote }} }
+            - { name: MLFLOW_SQLALCHEMYSTORE_POOL_SIZE, value: {{ $db.poolSize | quote }} }
+            - { name: MLFLOW_SQLALCHEMYSTORE_MAX_OVERFLOW, value: {{ $db.maxOverflow | quote }} }
           ports:
             - { name: http, containerPort: 5000 }
           startupProbe:
