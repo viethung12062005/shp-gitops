@@ -1,0 +1,15 @@
+# Values of Keycloak (platform/charts/shp-keycloak) in uat. FILL IN the empty fields before provisioning (none is a secret):
+# they are the non-secret outputs of `terraform output keycloak_values` (IAC-16). tools/validate.sh --strict fails while one is empty.
+replicaCount: 1
+hostname: ""                # gateway.hostname of envs/uat/platform.yaml
+database:
+  host: ""                  # keycloak_values.database.host
+  name: keycloak            # keycloak_values.database.name
+  username: keycloak        # keycloak_values.database.username (password mode)
+workloadIdentity:
+  clientId: ""              # keycloak_values.workloadIdentity.clientId
+keyVault:
+  name: ""                  # keycloak_values.keyVault.name
+  tenantId: ""              # keycloak_values.keyVault.tenantId
+kubernetesClientAuth:
+  issuer: ""                # OIDC issuer URL of the AKS cluster (iss claim of ServiceAccount tokens), IAC cluster output oidc_issuer_url

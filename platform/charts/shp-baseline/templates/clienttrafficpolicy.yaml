@@ -1,0 +1,22 @@
+{{- if and .Values.gateway.enabled .Values.gateway.clientTrafficPolicy.enabled }}
+# Real client IP at the Gateway (IAM-06, decision B2). Envoy Gateway uses the TCP peer address by default. When an L7
+# proxy terminates the connection in front of the Gateway's load balancer (Azure Front Door/WAF), that peer is the
+# proxy and every client looks identical — which turns the per-client /idp rate limit into one global limit.
+# numTrustedHops counts trusted proxies from the RIGHT of X-Forwarded-For: 1 = the Front Door/WAF hop only. It is a
+# values entry per environment (gateway.xffNumTrustedHops, envs/<env>/platform.yaml) because it must match the real
+# topology: too high and a client can spoof the header and dodge the rate limit; the header is not trusted at all at 0.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: shp-gateway
+  namespace: {{ .Values.appsNamespace }}
+  labels:
+    app.kubernetes.io/part-of: smart-hospital-platform
+    shp.example.org/apps: "true"
+spec:
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: Gateway, name: shp-gateway }
+  clientIPDetection:
+    xForwardedFor:
+      numTrustedHops: {{ .Values.gateway.xffNumTrustedHops }}
+{{- end }}

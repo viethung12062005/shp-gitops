@@ -1,0 +1,36 @@
+# The `shp` realm as code. Keycloak imports it (--import-realm) when the realm does not exist yet, so an empty database
+# is rebuilt to this state. ${SHP_PUBLIC_HOST} is replaced from the pod environment at import time.
+# Source: application repo identity/realm/ (tools/identity/realm.py); this copy is checked against it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+data:
+  realm-shp.json: |
+{{ .Files.Get .Values.realm.importFile | indent 4 }}
+---
+# Password policy passwordBlacklist(breached-passwords.txt) reads this file from Keycloak's data directory (IAM-06).
+# The committed list is a short starter; a realm that serves real users renders with a curated list
+# (tools/identity/fetch-breached-password-list.sh) and `requireCuratedList: true`.
+{{- $blacklist := .Files.Get .Values.passwordBlacklist.file }}
+{{- if not $blacklist }}
+{{- fail (printf "passwordBlacklist.file not found in the chart: %s" .Values.passwordBlacklist.file) }}
+{{- end }}
+{{- $entries := len (compact (splitList "\n" $blacklist)) }}
+{{- if and .Values.passwordBlacklist.requireCuratedList (lt $entries (int .Values.passwordBlacklist.minEntries)) }}
+{{- fail (printf "passwordBlacklist.file has %d entries, %d are required: run tools/identity/fetch-breached-password-list.sh (passwordBlacklist.requireCuratedList is true)" $entries (int .Values.passwordBlacklist.minEntries)) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-password-blacklist
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+  annotations:
+    # Visible in `helm template`/Argo diff so a starter list in a real environment is noticed.
+    shp.example.org/password-blacklist-entries: {{ $entries | quote }}
+data:
+  breached-passwords.txt: |
+{{ $blacklist | indent 4 }}

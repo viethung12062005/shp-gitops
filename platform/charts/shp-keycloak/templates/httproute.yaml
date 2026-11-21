@@ -1,0 +1,59 @@
+{{- if .Values.route.enabled }}
+# /idp through the shared Gateway (ADR-0017): same host as the web app, so no CORS. Only what a browser and a token
+# validator need is routed. The admin console and REST API (/idp/admin), the master realm, dynamic client registration
+# (/idp/realms/shp/clients-registrations), the health and metrics endpoints are NOT routed (IAM-06).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: idp
+  namespace: {{ .Values.appsNamespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.route.gatewayName }}
+      {{- if .Values.route.tls }}
+      sectionName: https
+      {{- end }}
+  hostnames: [ {{ required "hostname is required" .Values.hostname | quote }} ]
+  rules:
+    - matches:
+        {{- range $p := list "/idp/realms/shp/protocol/openid-connect" "/idp/realms/shp/.well-known" "/idp/realms/shp/login-actions" "/idp/realms/shp/account" "/idp/resources" }}
+        - path: { type: PathPrefix, value: {{ $p }} }
+        {{- end }}
+        - path: { type: Exact, value: /idp/realms/shp }
+      backendRefs:
+        - name: keycloak
+          namespace: {{ .Values.namespace }}
+          port: 8080
+{{- if .Values.route.rateLimit.enabled }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: idp
+  namespace: {{ .Values.appsNamespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: idp }
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - clientSelectors:
+            - sourceCIDR: { type: Distinct, value: 0.0.0.0/0 }
+          limit: { requests: {{ .Values.route.rateLimit.requestsPerMinute }}, unit: Minute }
+{{- end }}
+---
+# A route may only point at a Service in another namespace when that namespace allows it.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-idp-route
+  namespace: {{ .Values.namespace }}
+spec:
+  from:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, namespace: {{ .Values.appsNamespace }} }
+  to:
+    - { group: "", kind: Service, name: keycloak }
+{{- end }}

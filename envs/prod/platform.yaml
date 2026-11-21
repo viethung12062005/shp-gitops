@@ -5,3 +5,7 @@ gateway:
   hostname: ""              # e.g. api.prod.<domain>
   acmeEmail: ""
   acmeServer: https://acme-v02.api.letsencrypt.org/directory
+  # IAM-06 (B2): trusted L7 proxy hops in front of the Gateway's load balancer (platform/charts/shp-baseline/values.yaml).
+  # 0 while nothing sits in front of the load balancer; set to 1 in the same change that puts Azure Front Door/WAF in
+  # front of this Gateway (IAC-*). The per-client /idp rate limit only sees real client IPs once this matches reality.
+  xffNumTrustedHops: 0
