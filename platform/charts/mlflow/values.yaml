@@ -52,3 +52,4 @@ networkPolicy:
   clientNamespaces: [shp-apps]   # namespaces allowed to call the server (ml service, training/retraining jobs)
   privateCidr: 10.0.0.0/8        # VNet: PostgreSQL and Blob private endpoints
   entraEgressCidr: 0.0.0.0/0     # Microsoft Entra ID token endpoint (public, 443 only), needed by Workload Identity
+  entraEgressExcept: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16]   # never via this rule: private ranges, IMDS

@@ -42,7 +42,12 @@ spec:
         - { port: 5432, protocol: TCP }
         - { port: 443, protocol: TCP }
     # Workload Identity exchanges the pod token at the Microsoft Entra ID endpoint, which is public (443 only).
+    # Private and link-local ranges are excluded (same rule shape as shp-keycloak): in-VNet traffic is covered by the
+    # rule above, and the node's instance metadata endpoint (169.254.169.254) stays unreachable, so the pod can never
+    # fall back to the node's identity.
     - to:
-        - ipBlock: { cidr: {{ .Values.networkPolicy.entraEgressCidr }} }
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.entraEgressCidr }}
+            except: {{- toYaml .Values.networkPolicy.entraEgressExcept | nindent 14 }}
       ports:
         - { port: 443, protocol: TCP }
