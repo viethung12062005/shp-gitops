@@ -1,0 +1,4 @@
+# The curated breached-password list is fetched by tools/identity/fetch-breached-password-list.sh from a pinned
+# SecLists commit (checksum verified). It is large and has no place in the repository; the chart's committed starter
+# list is files/breached-passwords.txt.
+platform/charts/shp-keycloak/files/breached-passwords-curated.txt
