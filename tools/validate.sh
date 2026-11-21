@@ -32,6 +32,10 @@ for env in uat prod; do
   helm template shp-baseline platform/charts/shp-baseline -f "envs/$env/platform.yaml" \
     --set acrLoginServer=acrshpci.azurecr.io --set gateway.hostname=api.$env.example.org --set gateway.acmeEmail=ci@example.org \
     > "$OUT/baseline-$env.yaml"
+  helm template mlflow platform/charts/mlflow -f "envs/$env/addons/mlflow.yaml" \
+    --set image.repository=acrshpci.azurecr.io/mlflow --set image.digest="sha256:$(printf '0%.0s' {1..64})" \
+    --set workloadIdentity.clientId=00000000-0000-0000-0000-000000000000 --set database.host=psql-ci.postgres.database.azure.com \
+    --set database.user=id-ci-mlflow --set artifacts.storageAccount=stci > "$OUT/mlflow-$env.yaml" || { echo "  render failed: $env/mlflow"; fail=1; }
   for d in envs/$env/*/; do
     svc=$(basename "$d"); [ "$svc" = addons ] && continue
     helm template "$svc" "$CHART" -f envs/services-common.yaml -f "envs/$env/services.yaml" -f "$d/values.yaml" \
@@ -42,7 +46,7 @@ done
 kubeconform -strict -summary "${SCHEMAS[@]}" "$OUT"/*.yaml clusters/*/*.yaml bootstrap/root-*.yaml || fail=1
 
 echo "== 4. Required placeholders still empty"
-empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME): ""' envs || true)
+empty=$(grep -rnE '^\s*(acrLoginServer|hostname|acmeEmail|OIDC_AUTHORITY|OIDC_AUDIENCE|repository|clientId|SPRING_DATASOURCE_URL|SPRING_DATASOURCE_USERNAME|storageAccount|host|user): ""' envs || true)
 # Web app runtime config (JSON inside envs/<env>/web/values.yaml): login server and SPA client ID.
 web_empty=$(grep -rnE '"(authority|clientId)": ""' envs || true)
 empty=$(printf '%s\n%s\n' "$empty" "$web_empty" | sed '/^$/d')

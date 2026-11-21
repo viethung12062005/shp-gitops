@@ -71,6 +71,36 @@ spec:
     automated: { prune: true, selfHeal: true }
     retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the add-on CRDs to be ready
 ---
+# MLflow tracking + model registry (GOP-10; ADR-0007, 16-mlops). Local chart; PostgreSQL backend store and Blob artifacts, both through
+# Workload Identity. Lives in shp-deps like in the local profile, so the ml service reaches it at http://mlflow.shp-deps:5000.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
+    targetRevision: main
+    path: platform/charts/mlflow
+    helm:
+      valueFiles: [../../../envs/uat/addons/mlflow.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shp-deps
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]
+    managedNamespaceMetadata:
+      labels:
+        pod-security.kubernetes.io/enforce: restricted
+        pod-security.kubernetes.io/enforce-version: latest
+        pod-security.kubernetes.io/warn: restricted
+    retry: { limit: 5, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }
+---
 # Dashboards and Prometheus rules owned by OBS-01..03. Applied after kube-prometheus-stack so the
 # PrometheusRule CRD exists (sync-wave -3) and before the services (wave 0).
 apiVersion: argoproj.io/v1alpha1

@@ -23,6 +23,7 @@ flowchart LR
 | `clusters/<env>/platform.yaml` | ApplicationSet for add-ons (pinned chart version) + the `shp-baseline` Application | SA |
 | `clusters/<env>/services.yaml` | Service ApplicationSet: every `envs/<env>/<svc>/values.yaml` that **has a digest** becomes one Application | SA |
 | `platform/addons/<name>/values.yaml` | Add-on values; per-environment overrides live in `envs/<env>/addons/<name>.yaml` | SA |
+| `platform/charts/mlflow/`, `envs/<env>/addons/mlflow.yaml` | MLflow tracking + model registry in namespace `shp-deps` (GOP-10): PostgreSQL backend store, artifacts on the Blob `mlops` container, both through Workload Identity (no password or key); NetworkPolicy limits callers to `shp-apps` | SA |
 | `platform/charts/shp-baseline/` | Namespace at PSA restricted, default-deny NetworkPolicy, 4 Kyverno policies (ACR only, cosign signature, no `:latest`, resources/probes required), Gateway + Let's Encrypt | SA |
 | `envs/services-common.yaml`, `envs/<env>/services.yaml` | Values shared by every service (OTLP, OIDC, replica count) | SA |
 | `envs/<env>/<svc>/values.yaml` | Per-service values; **`image.digest` is written by the pipeline, never edited by hand** | pipeline / SA |
@@ -39,6 +40,7 @@ flowchart LR
 Fill in the fields that are still empty. None of them is a secret; the values come from Terraform outputs and the Keycloak realm (ADR-0017; `OIDC_AUTHORITY` = `https://<gateway.hostname>/idp/realms/shp`, `OIDC_AUDIENCE` = `shp-api`):
 - `envs/<env>/platform.yaml`: `acrLoginServer`, `gateway.hostname`, `gateway.acmeEmail`.
 - `envs/<env>/services.yaml`: `OIDC_AUTHORITY`, `OIDC_AUDIENCE`.
+- `envs/<env>/addons/mlflow.yaml` (GOP-10): `image.repository` and `image.digest` (the MLflow image with the PostgreSQL and Azure drivers, recipe in `platform/charts/mlflow/values.yaml`), `workloadIdentity.clientId`, `database.host`, `database.user` (Entra principal of the mlflow identity), `artifacts.storageAccount`.
 - `envs/<env>/<svc>/values.yaml`: `image.repository` = `<acrLoginServer>/<svc>`.
 
 Check with `tools/validate.sh --strict` (it fails while a field is empty). Secrets, including Argo CD's repo read credential and the
