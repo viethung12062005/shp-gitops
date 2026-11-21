@@ -15,6 +15,11 @@ env:
   # FILL IN: jdbc:postgresql://<output postgres_fqdn>:5432/scheduling?sslmode=require&authenticationPluginClassName=com.azure.identity.extensions.jdbc.postgresql.AzurePostgresqlAuthenticationPlugin
   SPRING_DATASOURCE_URL: ""
   SPRING_DATASOURCE_USERNAME: ""  # FILL IN: output workload_identity_names["scheduling"] (id-<prefix>-scheduling); the principal is created per shp-infra/modules/postgres/README.md
+  # Connection budget (PRD-11): uat runs PostgreSQL B_Standard_B1ms (shp-infra modules/environment), 50 connections of which
+  # Azure reserves 15. KEDA can run up to maxReplicaCount (10) pods; with Hikari's default pool of 10 that is 100 and the
+  # 07:00 scale-out would fail on "too many connections". 10 pods x 2 = 20, leaving room for MLflow (GOP-10) and admin
+  # sessions. Prod (GP_Standard_D2ds_v5) keeps the default pool.
+  SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "2"
 resources:
   requests: { cpu: 100m, memory: 384Mi }
   limits: { memory: 768Mi }   # JVM: -XX:MaxRAMPercentage=75

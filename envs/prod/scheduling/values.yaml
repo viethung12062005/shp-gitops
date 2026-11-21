@@ -32,7 +32,7 @@ keda:
   minReplicaCount: 2
   # Ceiling for the cpu trigger: 6 scheduled pods plus 4 of headroom for a surge above the 1x figures. The 5x scenario
   # (2,500 RPS) is not meant to be absorbed by pods alone: workload-analysis.md §4 names the Redis slot cache and a read
-  # replica for it.
+  # replica for it. Connections: 10 pods x Hikari's default pool of 10 = 100, well inside GP_Standard_D2ds_v5.
   maxReplicaCount: 10
   triggers:
     # 06:45-07:30 local time, every day. Start 15 minutes early: time for the cluster autoscaler to add a node, the image
