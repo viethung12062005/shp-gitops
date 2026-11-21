@@ -1,0 +1,62 @@
+{{- $image := include "ml-retrain.image" . }}
+{{- if $image }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ml-retrain
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "ml-retrain.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  timeZone: {{ .Values.timeZone | quote }}
+  suspend: {{ .Values.suspend }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.historyLimit }}
+  failedJobsHistoryLimit: {{ .Values.historyLimit }}
+  jobTemplate:
+    metadata:
+      labels: {{- include "ml-retrain.labels" . | nindent 8 }}
+    spec:
+      backoffLimit: 0                 # a failed run is recorded by the job itself; never retried behind its back
+      activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: {{ .Values.ttlSecondsAfterFinished }}
+      template:
+        metadata:
+          labels:
+            {{- include "ml-retrain.labels" . | nindent 12 }}
+            azure.workload.identity/use: "true"
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ .Values.serviceAccountName }}
+          automountServiceAccountToken: false   # the Workload Identity webhook projects its own token
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: retrain
+              image: {{ $image | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["python", "-m", "shp_ml.retrain", "--datasets", "/data/datasets"]
+              env:
+                - { name: HOME, value: /tmp }
+                {{- range $k, $v := .Values.env }}
+                - { name: {{ $k }}, value: {{ $v | quote }} }
+                {{- end }}
+                - name: MONGODB_URI
+                  valueFrom: { secretKeyRef: { name: {{ .Values.mongodbSecret.name }}, key: {{ .Values.mongodbSecret.key }} } }
+              resources: {{- toYaml .Values.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: tmp, mountPath: /tmp }
+                - { name: datasets, mountPath: /data }
+          volumes:
+            - { name: tmp, emptyDir: {} }
+            - { name: datasets, emptyDir: { sizeLimit: {{ .Values.datasetsSizeLimit }} } }
+{{- end }}

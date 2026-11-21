@@ -101,6 +101,30 @@ spec:
         pod-security.kubernetes.io/warn: restricted
     retry: { limit: 5, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }
 ---
+# Retraining of the no-show model (MLO-04; 16-mlops §5): CronJob with concurrencyPolicy Forbid that runs `python -m shp_ml.retrain`.
+# Wave 1: after the services (wave 0), because it uses the `ml` ServiceAccount (and its Workload Identity) created by the ml service.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ml-retrain
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
+    targetRevision: main
+    path: platform/charts/ml-retrain
+    helm:
+      valueFiles: [../../../envs/prod/addons/ml-retrain.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shp-apps
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    retry: { limit: 5, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }
+---
 # Dashboards and Prometheus rules owned by OBS-01..03. Applied after kube-prometheus-stack so the
 # PrometheusRule CRD exists (sync-wave -3) and before the services (wave 0).
 apiVersion: argoproj.io/v1alpha1

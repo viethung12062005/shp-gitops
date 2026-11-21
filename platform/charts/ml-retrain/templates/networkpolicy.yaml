@@ -1,0 +1,39 @@
+{{- if include "ml-retrain.image" . }}
+# The namespace already denies all ingress (shp-baseline). A job pod accepts no connection at all and may only call
+# what retraining needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ml-retrain
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "ml-retrain.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ml-retrain
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    # MLflow tracking and registry (GOP-10).
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.networkPolicy.mlflowNamespace }} } }
+      ports:
+        - { port: 5000, protocol: TCP }
+    # MongoDB (Cosmos DB vCore private endpoint, port 10260) and the Blob private endpoint.
+    - to:
+        - ipBlock: { cidr: {{ .Values.networkPolicy.privateCidr }} }
+      ports:
+        - { port: 10260, protocol: TCP }
+        - { port: 27017, protocol: TCP }
+        - { port: 443, protocol: TCP }
+    # Workload Identity token exchange at Microsoft Entra ID (public, 443 only).
+    - to:
+        - ipBlock: { cidr: {{ .Values.networkPolicy.entraEgressCidr }} }
+      ports:
+        - { port: 443, protocol: TCP }
+{{- end }}
