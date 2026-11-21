@@ -43,7 +43,7 @@ keda:
     # 06:45-07:30 local time, every day. Start 15 minutes early: time for the cluster autoscaler to add a node, the image
     # pull and the JVM warm-up before the first request. End at 07:30: the surge lasts 5 minutes; the remaining time lets
     # the backlog of patients who retried drain, after which the cpu trigger alone decides.
-    # desiredReplicas 6: 550 RPS at the peak (500 find-slots + 50 booking) at an ASSUMED ~100 RPS per pod, plus one spare
+    # desiredReplicas 6: 550 RPS at the peak (500 find-slots + 50 booking) at an ASSUMED ~100 RPS per pod, giving ~9% headroom (5.5 pods rounded to 6)
     # pod. The per-pod figure is a planning assumption, not a measurement: correct it from the k6 run that NFR-S1 and
     # NFR-P1 prescribe (500 RPS on prod-sized uat) and change both environments together.
     - type: cron
