@@ -10,6 +10,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Read-only deploy key of the application repo (N6). Empty until it is provisioned: the checkout below and
+      # APP_DIR then skip the drift check and validate.sh says so, instead of the job failing for every PR.
+      APP_DEPLOY_KEY: ${{ secrets.APP_DEPLOY_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,13 +28,13 @@ jobs:
         # application repo. Check that repo out so validate.sh compares the copy with its source and fails on drift.
         # Read-only deploy key (secret APP_DEPLOY_KEY); while the key is missing the step is skipped and validate.sh
         # prints that the drift check did not run.
-        if: ${{ secrets.APP_DEPLOY_KEY != '' }}
+        if: env.APP_DEPLOY_KEY != ''
         with:
           repository: viethung12062005/smart-hospital-platform
           ref: main
           path: app
           fetch-depth: 1
-          ssh-key: ${{ secrets.APP_DEPLOY_KEY }}
+          ssh-key: ${{ env.APP_DEPLOY_KEY }}
       - name: Install helm 3.18.6 + kubeconform 0.7.0 (checksum verified)
         run: |
           set -euo pipefail
@@ -46,6 +50,6 @@ jobs:
       - name: Validate
         env:
           TEMPLATES_DIR: templates
-          # Empty when the application-repo checkout was skipped: validate.sh then states that the drift check did not run.
-          APP_DIR: ${{ secrets.APP_DEPLOY_KEY != '' && 'app' || '' }}
+          # Empty when the application-repo checkout was skipped: validate.sh then reports that the drift check did not run.
+          APP_DIR: ${{ env.APP_DEPLOY_KEY != '' && 'app' || '' }}
         run: tools/validate.sh
