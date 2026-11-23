@@ -1,0 +1,83 @@
+# Per-environment values live in envs/<env>/keycloak.yaml (FILL IN the empty fields from `terraform output keycloak_values`, IAC-16).
+namespace: shp-iam
+appsNamespace: shp-apps          # namespace of the shared Gateway; the /idp HTTPRoute lives there
+replicaCount: 1                  # prod: 2 (ADR-0017); one Keycloak outage stops every sign-in
+
+# Pinned by tag AND digest. Mirror to ACR is a follow-up (the Kyverno ACR policy only covers shp-apps).
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: "26.8.2"
+  digest: sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+
+# Public host of the platform, the same as gateway.hostname in envs/<env>/platform.yaml. Issuer = https://<hostname>/idp/realms/shp
+hostname: ""
+
+database:                        # IAC-16 output keycloak_values.database
+  host: ""                       # FQDN of the IAM PostgreSQL server (resolves only inside the VNet)
+  port: 5432
+  name: keycloak
+  username: keycloak
+  egressCidr: 10.0.0.0/8         # private endpoint subnet (same convention as envs/services-common.yaml)
+
+# Secrets: Key Vault through the Secrets Store CSI driver (never in this repo). The CSI volume is mounted by the pods and
+# synced into the Kubernetes Secret named below, which the container reads as environment variables.
+workloadIdentity:
+  clientId: ""                   # IAC-16 output keycloak_values.workloadIdentity.clientId
+keyVault:
+  name: ""                       # IAC-16 output keycloak_values.keyVault.name
+  tenantId: ""
+  dbPasswordSecret: keycloak-db-password
+  adminPasswordSecret: keycloak-admin-password
+secret:
+  name: keycloak-secrets         # synced Secret; keys: db-password, admin-password
+  # false = do not create a SecretProviderClass; the Secret above must already exist (local kind test only).
+  fromKeyVault: true
+
+# Kubernetes service-account client authentication (IAM-02): Keycloak fetches the cluster's OIDC discovery/JWKS over HTTPS.
+kubernetesClientAuth:
+  # Issuer URL of the cluster's service-account tokens (the `iss` claim): for AKS the `oidc_issuer_url` of the cluster
+  # (shp-infra, IAC-02/IAC-16 input). Keycloak fetches <issuer>/.well-known/openid-configuration and the keys from it.
+  issuer: ""
+  egress: true                   # allow outbound 443 for that fetch (AKS OIDC issuer is public)
+
+realm:
+  importFile: files/realm-shp.json   # built by tools/identity/realm.py in the application repo; do not edit by hand
+
+# Password policy passwordBlacklist(breached-passwords.txt) reads this file from Keycloak's data directory (IAM-06).
+passwordBlacklist:
+  # Relative to the chart directory. The committed starter list has 45 entries: enough for a test cluster, not for a
+  # realm that serves real users.
+  file: files/breached-passwords.txt
+  # Keycloak needs a real list (tools/identity/fetch-breached-password-list.sh downloads a pinned one with 100 000
+  # entries). Self-registration stays off until then.
+  minEntries: 100000
+  # true = refuse to render while the list is smaller than minEntries. Set together with `file` once the curated list is
+  # provisioned; tools/validate.sh --strict also refuses the starter list, so the step cannot be forgotten.
+  requireCuratedList: false
+
+route:
+  enabled: true                  # needs the Gateway API CRDs and the shp-gateway Gateway of shp-baseline
+  gatewayName: shp-gateway
+  tls: true                      # attach only to the https listener
+  # Per source address on the public /idp route (IAM-06): Keycloak locks a single account after 5 failures but cannot
+  # block an address, so Envoy limits requests per client IP. Needs the real client IP at the gateway (see keycloak.md).
+  rateLimit: { enabled: true, requestsPerMinute: 120 }
+
+service:
+  # ClusterIP: Keycloak is reachable through the Gateway's HTTPRoute and from shp-apps for the JWKS only.
+  type: ClusterIP
+  # IAM-06 (B2): Local keeps the client address and never forwards to another node. It matters once this Service is
+  # exposed through a node port or a load balancer; the ClusterIP path already keeps the source address.
+  externalTrafficPolicy: Local
+
+networkPolicy:
+  # Extra CIDRs that may reach Keycloak's port 8080 directly (an internal admin VPN/bastion range). Empty = nobody:
+  # the admin console is then reachable only with `kubectl port-forward` (RBAC-controlled).
+  adminCidrs: []
+
+pdb: { enabled: true }
+resources:
+  requests: { cpu: 500m, memory: 1Gi }
+  limits: { memory: 1536Mi }
+jvm:
+  heap: "-XX:MaxRAMPercentage=65 -XX:InitialRAMPercentage=50"

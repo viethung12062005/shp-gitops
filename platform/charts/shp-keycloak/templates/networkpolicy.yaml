@@ -1,0 +1,62 @@
+# ADR-0017 / IAC-16: only the gateway reaches Keycloak from outside the namespace, plus the services that fetch the signing
+# keys (JWKS). Everything else is denied; the admin console is reachable only through `kubectl port-forward` or an
+# explicitly listed admin CIDR (networkPolicy.adminCidrs).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels: {{- include "shp-keycloak.selector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Envoy Gateway proxy (runs in envoy-gateway-system): the public /idp route
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: envoy-gateway-system } }
+      ports: [ { port: 8080, protocol: TCP } ]
+    # Services validating tokens (JWKS). They never call the admin API.
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.appsNamespace }} } }
+      ports: [ { port: 8080, protocol: TCP } ]
+    # Replica to replica cluster traffic
+    - from:
+        - podSelector:
+            matchLabels: {{- include "shp-keycloak.selector" . | nindent 14 }}
+      ports: [ { port: 7800, protocol: TCP } ]
+    {{- with .Values.networkPolicy.adminCidrs }}
+    - from:
+        {{- range . }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [ { port: 8080, protocol: TCP } ]
+    {{- end }}
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to:
+        - podSelector:
+            matchLabels: {{- include "shp-keycloak.selector" . | nindent 14 }}
+      ports: [ { port: 7800, protocol: TCP } ]
+    # IAM PostgreSQL (private endpoint)
+    - to:
+        - ipBlock: { cidr: {{ .Values.database.egressCidr | quote }} }
+      ports: [ { port: {{ .Values.database.port }}, protocol: TCP } ]
+    {{- if .Values.kubernetesClientAuth.egress }}
+    # OIDC discovery + JWKS of the cluster (service-account client authentication, IAM-02)
+    - to:
+        - ipBlock: { cidr: 0.0.0.0/0, except: [ 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 ] }
+      ports: [ { port: 443, protocol: TCP } ]
+    {{- end }}

@@ -1,0 +1,12 @@
+{{- if and .Values.pdb.enabled (gt (int .Values.replicaCount) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "shp-keycloak.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "shp-keycloak.selector" . | nindent 6 }}
+{{- end }}

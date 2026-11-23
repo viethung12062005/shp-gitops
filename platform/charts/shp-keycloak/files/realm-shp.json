@@ -1,0 +1,1812 @@
+{
+  "realm": "shp",
+  "enabled": true,
+  "displayName": "Smart Hospital",
+  "registrationAllowed": false,
+  "registrationFlow": "shp registration",
+  "editUsernameAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "loginTheme": "shp",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "vi",
+    "en"
+  ],
+  "defaultLocale": "vi",
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      {
+        "name": "patient",
+        "description": "Patient"
+      },
+      {
+        "name": "doctor",
+        "description": "Doctor",
+        "composites": {
+          "realm": [
+            "mfa-required"
+          ]
+        }
+      },
+      {
+        "name": "nurse",
+        "description": "Nurse",
+        "composites": {
+          "realm": [
+            "mfa-required"
+          ]
+        }
+      },
+      {
+        "name": "admin",
+        "description": "Administrator",
+        "composites": {
+          "realm": [
+            "mfa-required"
+          ]
+        }
+      },
+      {
+        "name": "dpo",
+        "description": "Data protection officer",
+        "composites": {
+          "realm": [
+            "mfa-required"
+          ]
+        }
+      },
+      {
+        "name": "mfa-required",
+        "description": "Marker included in every staff role: the browser flow demands a TOTP code from its holders (IAM-10)"
+      },
+      {
+        "name": "internal.clinical",
+        "description": "May call /internal of clinical"
+      },
+      {
+        "name": "internal.document",
+        "description": "May call /internal of document"
+      },
+      {
+        "name": "internal.ml",
+        "description": "May call /internal of ml"
+      },
+      {
+        "name": "internal.notification",
+        "description": "May call /internal of notification"
+      },
+      {
+        "name": "internal.scheduling",
+        "description": "May call /internal of scheduling"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "shp-web",
+      "name": "Smart Hospital web (PWA)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "https://${SHP_PUBLIC_HOST}/*"
+      ],
+      "webOrigins": [
+        "https://${SHP_PUBLIC_HOST}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "web-origins",
+        "profile",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-shp-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "shp-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "amr-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "shp-api",
+      "name": "Delegated exchange for ai",
+      "enabled": true,
+      "bearerOnly": false,
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "amr-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "config": {
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
+      "publicClient": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "exchange-clinical",
+        "exchange-scheduling"
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:ai-exchange",
+        "standard.token.exchange.enabled": "true",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-clinical",
+      "name": "Service account of clinical (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-document",
+        "call-scheduling",
+        "call-notification"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:clinical",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-scheduling",
+      "name": "Service account of scheduling (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-clinical",
+        "call-ml"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:scheduling",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-notification",
+      "name": "Service account of notification (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-clinical"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:notification",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-document",
+      "name": "Service account of document (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-clinical"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:document",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-ai",
+      "name": "Service account of ai (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-clinical",
+        "call-document"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:ai",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-ml",
+      "name": "Service account of ml (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-scheduling"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:ml",
+        "use.refresh.tokens": "false"
+      }
+    },
+    {
+      "clientId": "svc-audit",
+      "name": "Service account of audit (/internal)",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "clientAuthenticatorType": "federated-jwt",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": [
+        "call-clinical"
+      ],
+      "protocolMappers": [
+        {
+          "name": "roles-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "attributes": {
+        "jwt.credential.issuer": "kubernetes",
+        "jwt.credential.sub": "system:serviceaccount:shp-apps:audit",
+        "use.refresh.tokens": "false"
+      }
+    }
+  ],
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyInitialCounter": 0,
+  "sslRequired": "external",
+  "passwordPolicy": "length(12) and maxLength(128) and notUsername and notEmail and hashAlgorithm(argon2) and passwordBlacklist(breached-passwords.txt)",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "eventsEnabled": true,
+  "eventsListeners": [
+    "jboss-logging"
+  ],
+  "eventsExpiration": 7776000,
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "REGISTER",
+    "REGISTER_ERROR",
+    "UPDATE_PASSWORD",
+    "UPDATE_PASSWORD_ERROR",
+    "UPDATE_TOTP",
+    "REMOVE_TOTP",
+    "RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR",
+    "CLIENT_LOGIN",
+    "CLIENT_LOGIN_ERROR",
+    "USER_DISABLED_BY_TEMPORARY_LOCKOUT",
+    "USER_DISABLED_BY_PERMANENT_LOCKOUT"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
+  "identityProviders": [
+    {
+      "alias": "kubernetes",
+      "providerId": "kubernetes",
+      "enabled": true,
+      "hideOnLogin": true,
+      "config": {
+        "issuer": "${SHP_K8S_OIDC_ISSUER}"
+      }
+    }
+  ],
+  "smtpServer": {
+    "host": "${SHP_SMTP_HOST}",
+    "port": "${SHP_SMTP_PORT}",
+    "from": "${SHP_SMTP_FROM}",
+    "fromDisplayName": "Smart Hospital",
+    "auth": "true",
+    "user": "${SHP_SMTP_USER}",
+    "password": "${SHP_SMTP_PASSWORD}",
+    "starttls": "true",
+    "ssl": "false"
+  },
+  "attributes": {
+    "CreateDefaultClientScopes": "true"
+  },
+  "clientScopes": [
+    {
+      "name": "call-clinical",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-clinical",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-clinical",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "call-document",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-document",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-document",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "call-ml",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-ml",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-ml",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "call-notification",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-notification",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-notification",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "call-scheduling",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-scheduling",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-scheduling",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "exchange-clinical",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-clinical",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-clinical",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "exchange-scheduling",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-svc-scheduling",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "svc-scheduling",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-svc-clinical",
+      "enabled": true,
+      "serviceAccountClientId": "svc-clinical",
+      "realmRoles": [
+        "internal.document",
+        "internal.scheduling",
+        "internal.notification"
+      ]
+    },
+    {
+      "username": "service-account-svc-scheduling",
+      "enabled": true,
+      "serviceAccountClientId": "svc-scheduling",
+      "realmRoles": [
+        "internal.clinical",
+        "internal.ml"
+      ]
+    },
+    {
+      "username": "service-account-svc-notification",
+      "enabled": true,
+      "serviceAccountClientId": "svc-notification",
+      "realmRoles": [
+        "internal.clinical"
+      ]
+    },
+    {
+      "username": "service-account-svc-document",
+      "enabled": true,
+      "serviceAccountClientId": "svc-document",
+      "realmRoles": [
+        "internal.clinical"
+      ]
+    },
+    {
+      "username": "service-account-svc-ai",
+      "enabled": true,
+      "serviceAccountClientId": "svc-ai",
+      "realmRoles": [
+        "internal.clinical",
+        "internal.document"
+      ]
+    },
+    {
+      "username": "service-account-svc-ml",
+      "enabled": true,
+      "serviceAccountClientId": "svc-ml",
+      "realmRoles": [
+        "internal.scheduling"
+      ]
+    },
+    {
+      "username": "service-account-svc-audit",
+      "enabled": true,
+      "serviceAccountClientId": "svc-audit",
+      "realmRoles": [
+        "internal.clinical"
+      ]
+    }
+  ],
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "shp-reject-target-request",
+        "executors": [
+          {
+            "executor": "reject-request",
+            "configuration": {}
+          }
+        ]
+      }
+    ]
+  },
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "shp-call-target-required",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "client_credentials"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-clinical",
+                "call-document",
+                "call-ml",
+                "call-notification",
+                "call-scheduling"
+              ],
+              "is-negative-logic": true
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-reject-call-clinical-plus-call-document",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "client_credentials"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-clinical"
+              ],
+              "is-negative-logic": false
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-document"
+              ],
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-reject-call-clinical-plus-call-ml",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "client_credentials"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-clinical"
+              ],
+              "is-negative-logic": false
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-ml"
+              ],
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-reject-call-document-plus-call-notification",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "client_credentials"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-document"
+              ],
+              "is-negative-logic": false
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-notification"
+              ],
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-reject-call-document-plus-call-scheduling",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "client_credentials"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-document"
+              ],
+              "is-negative-logic": false
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-scheduling"
+              ],
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-reject-call-notification-plus-call-scheduling",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "client_credentials"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-notification"
+              ],
+              "is-negative-logic": false
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "call-scheduling"
+              ],
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-exchange-target-required",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "urn:ietf:params:oauth:grant-type:token-exchange"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "exchange-clinical",
+                "exchange-scheduling"
+              ],
+              "is-negative-logic": true
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      },
+      {
+        "name": "shp-reject-exchange-clinical-plus-exchange-scheduling",
+        "enabled": true,
+        "mode": "STRICT",
+        "conditions": [
+          {
+            "condition": "grant-type",
+            "configuration": {
+              "grant_types": [
+                "urn:ietf:params:oauth:grant-type:token-exchange"
+              ]
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "exchange-clinical"
+              ],
+              "is-negative-logic": false
+            }
+          },
+          {
+            "condition": "client-scopes",
+            "configuration": {
+              "type": "Optional",
+              "scopes": [
+                "exchange-scheduling"
+              ],
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": [
+          "shp-reject-target-request"
+        ]
+      }
+    ]
+  },
+  "authenticationFlows": [
+    {
+      "alias": "Account verification options",
+      "description": "Method with which to verify the existing account",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-email-verification",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "flowAlias": "Verify Existing Account by Re-authentication",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Browser - Conditional 2FA",
+      "description": "Flow to determine if any 2FA is required for the authentication",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 15,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "shp-user-is-not-staff"
+        },
+        {
+          "authenticatorConfig": "browser-conditional-credential",
+          "authenticator": "conditional-credential",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "shp-otp-reference-mfa-patient-browser"
+        },
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 40,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 50,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Browser - Conditional Organization",
+      "description": "Flow to determine if the organization identity-first login is to be used",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "organization",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Direct Grant - Conditional OTP",
+      "description": "Flow to determine if the OTP is required for the authentication",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 15,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "shp-user-is-not-staff"
+        },
+        {
+          "authenticator": "direct-grant-validate-otp",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticatorConfig": "shp-otp-reference-mfa-patient-direct-grant"
+        }
+      ]
+    },
+    {
+      "alias": "First Broker Login - Conditional Organization",
+      "description": "Flow to determine if the authenticator that adds organization members is to be used",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "idp-add-organization-member",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "First broker login - Conditional 2FA",
+      "description": "Flow to determine if any 2FA is required for the authentication",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorConfig": "first-broker-login-conditional-credential",
+          "authenticator": "conditional-credential",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 40,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 50,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Handle Existing Account",
+      "description": "Handle what to do if there is existing account with same email/username like authenticated identity provider",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-confirm-link",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "flowAlias": "Account verification options",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Organization",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "flowAlias": "Browser - Conditional Organization",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Reset - Conditional OTP",
+      "description": "Flow to determine if the OTP should be reset or not. Set to REQUIRED to force.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "reset-otp",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "User creation or linking",
+      "description": "Flow for the existing/non-existing user alternatives",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticatorConfig": "create unique user config",
+          "authenticator": "idp-create-user-if-unique",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "flowAlias": "Handle Existing Account",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Verify Existing Account by Re-authentication",
+      "description": "Reauthentication of existing account",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "flowAlias": "First broker login - Conditional 2FA",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "browser",
+      "description": "Browser based authentication",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-spnego",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 25,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 26,
+          "flowAlias": "Organization",
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "flowAlias": "forms",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "clients",
+      "description": "Base authentication for clients",
+      "providerId": "client-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "client-secret",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "client-jwt",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "client-secret-jwt",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "client-x509",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "federated-jwt",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 50,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "direct grant",
+      "description": "OpenID Connect Resource Owner Grant",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "direct-grant-validate-username",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "direct-grant-validate-password",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 25,
+          "userSetupAllowed": false,
+          "flowAlias": "Direct Grant - Staff MFA"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "flowAlias": "Direct Grant - Conditional OTP",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "docker auth",
+      "description": "Used by Docker clients to authenticate against the IDP",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "docker-http-basic-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "first broker login",
+      "description": "Actions taken after first broker login with identity provider account, which is not yet linked to any Keycloak account",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticatorConfig": "review profile config",
+          "authenticator": "idp-review-profile",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "flowAlias": "User creation or linking",
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 60,
+          "flowAlias": "First Broker Login - Conditional Organization",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "forms",
+      "description": "Username, password, otp and other auth forms.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 15,
+          "userSetupAllowed": false,
+          "flowAlias": "Browser - Staff MFA"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "flowAlias": "Browser - Conditional 2FA",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "registration",
+      "description": "Registration flow",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "registration-page-form",
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "flowAlias": "registration form",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "registration form",
+      "description": "Registration form",
+      "providerId": "form-flow",
+      "topLevel": false,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "registration-user-creation",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "registration-password-action",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 50,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "registration-recaptcha-action",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 60,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "registration-terms-and-conditions",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 70,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "reset credentials",
+      "description": "Reset credentials for a user if they forgot their password or something",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "reset-credentials-choose-user",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "reset-credential-email",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "reset-password",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 40,
+          "flowAlias": "Reset - Conditional OTP",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "saml ecp",
+      "description": "SAML ECP Profile Authentication Flow",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "http-basic-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "Browser - Staff MFA",
+      "description": "Staff roles must present a TOTP code",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "shp-user-is-staff"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "auth-otp-form",
+          "authenticatorConfig": "shp-otp-reference-mfa-staff-browser"
+        }
+      ]
+    },
+    {
+      "alias": "Direct Grant - Staff MFA",
+      "description": "Staff roles must present a TOTP code",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "shp-user-is-staff"
+        },
+        {
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "authenticator": "direct-grant-validate-otp",
+          "authenticatorConfig": "shp-otp-reference-mfa-staff-direct-grant"
+        }
+      ]
+    },
+    {
+      "alias": "shp registration",
+      "description": "SHP sign-up (IAM-08): phone number or email and terms, ownership code, then the account. Nothing reveals whether an account exists before the code is verified.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "shp-registration-identifier",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "shp-ownership-code",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "shp-registration-account",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "browser-conditional-credential",
+      "config": {
+        "credentials": "webauthn-passwordless"
+      }
+    },
+    {
+      "alias": "create unique user config",
+      "config": {
+        "require.password.update.after.registration": "false"
+      }
+    },
+    {
+      "alias": "first-broker-login-conditional-credential",
+      "config": {
+        "credentials": "webauthn-passwordless"
+      }
+    },
+    {
+      "alias": "review profile config",
+      "config": {
+        "update.profile.on.first.login": "missing"
+      }
+    },
+    {
+      "alias": "shp-user-is-staff",
+      "config": {
+        "condUserRole": "mfa-required",
+        "negate": "false"
+      }
+    },
+    {
+      "alias": "shp-user-is-not-staff",
+      "config": {
+        "condUserRole": "mfa-required",
+        "negate": "true"
+      }
+    },
+    {
+      "alias": "shp-otp-reference-mfa-staff-browser",
+      "config": {
+        "default.reference.value": "mfa",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "shp-otp-reference-mfa-staff-direct-grant",
+      "config": {
+        "default.reference.value": "mfa",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "shp-otp-reference-mfa-patient-browser",
+      "config": {
+        "default.reference.value": "mfa",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "shp-otp-reference-mfa-patient-direct-grant",
+      "config": {
+        "default.reference.value": "mfa",
+        "default.reference.maxAge": "36000"
+      }
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}}},{\"name\":\"phoneNumber\",\"displayName\":\"${phoneNumber}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"pattern\":{\"pattern\":\"^\\\\+84[35789][0-9]{8}$\",\"error-message\":\"shpPhoneNumberInvalid\"}}},{\"name\":\"phoneNumberVerified\",\"displayName\":\"Phone number verified\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"validations\":{\"options\":{\"options\":[\"true\",\"false\"]}}},{\"name\":\"terms_and_conditions\",\"displayName\":\"Terms of use accepted at (epoch seconds)\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  }
+}

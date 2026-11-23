@@ -15,3 +15,11 @@ gateway:
   hostname: ""              # e.g. api.uat.<domain>; when empty the Gateway only has an HTTP listener (no TLS)
   acmeEmail: ""             # address that receives Let's Encrypt notices (not patient data)
   acmeServer: https://acme-staging-v02.api.letsencrypt.org/directory
+  # IAM-06 (B2): real client IP for the per-client rate limit on /idp. Number of trusted L7 proxy hops in front of the
+  # Gateway's load balancer, counted from the right of X-Forwarded-For. 0 = no proxy in front (the load balancer keeps
+  # the source address, Envoy uses the TCP peer). 1 = exactly one Front Door/WAF hop. Set it per environment in
+  # envs/<env>/platform.yaml; a wrong (too high) value lets a client spoof the header and dodge the limit.
+  xffNumTrustedHops: 0
+  clientTrafficPolicy:
+    # Needs the Envoy Gateway CRDs (platform/addons/envoy-gateway, installed by the platform ApplicationSet).
+    enabled: true

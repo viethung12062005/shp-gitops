@@ -71,6 +71,31 @@ spec:
     automated: { prune: true, selfHeal: true }
     retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the add-on CRDs to be ready
 ---
+# Keycloak, the identity provider (ADR-0017, IAM-01): namespace shp-iam, realm `shp` imported from code, /idp route on the shared Gateway.
+# Wave -1: after shp-baseline (Gateway, CRDs) and before the services that validate its tokens.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/viethung12062005/shp-gitops.git
+    targetRevision: main
+    path: platform/charts/shp-keycloak
+    helm:
+      valueFiles: [../../../envs/uat/keycloak.yaml]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shp-iam
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry: { limit: 10, backoff: { duration: 30s, factor: 2, maxDuration: 5m } }   # wait for the Gateway API and Secrets Store CRDs
+---
 # MLflow tracking + model registry (GOP-10; ADR-0007, 16-mlops). Local chart; PostgreSQL backend store and Blob artifacts, both through
 # Workload Identity. Lives in shp-deps like in the local profile, so the ml service reaches it at http://mlflow.shp-deps:5000.
 apiVersion: argoproj.io/v1alpha1
