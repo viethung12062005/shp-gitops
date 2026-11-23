@@ -69,6 +69,15 @@ spec:
   rules:
     - name: resources-and-probes
       match: { any: [ { resources: { kinds: [Pod], namespaces: [{{ $ns }}] } } ] }
+      {{- with $p.probeExemptApps }}
+      # Batch pods (no port to probe): only the named apps skip this rule; the image, signature and :latest policies still apply.
+      exclude:
+        any:
+          - resources:
+              selector:
+                matchExpressions:
+                  - { key: app.kubernetes.io/name, operator: In, values: [{{ join ", " . }}] }
+      {{- end }}
       validate:
         message: "The container must set cpu and memory requests, a memory limit, a readinessProbe and a livenessProbe"
         pattern:

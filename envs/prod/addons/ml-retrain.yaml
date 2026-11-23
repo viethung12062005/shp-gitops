@@ -1,0 +1,4 @@
+# Values of platform/charts/ml-retrain for prod. The chart renders nothing until image.digest is set (training image, MLO-02).
+image:
+  repository: ""            # <acrLoginServer>/ml-train
+  digest: ""

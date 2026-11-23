@@ -5,16 +5,31 @@ image:
   digest: ""
 env:
   OTEL_SERVICE_NAME: ml
+  # Model canary (MLO-03, 16-mlops section 6): the registry version these pods serve. Changing it is a pod template
+  # change, so Argo Rollouts canaries the new MODEL below exactly like a new image: canary pods serve the new version,
+  # stable pods keep the old one and shadow the candidate (paired score PSI and agreement, ML-25). Abort = old model.
+  # Written by the model promotion (MLO-01) like image.digest; set it to the version of the `candidate` alias.
+  # Empty = follow the `production` alias (no model canary possible).
+  SERVING_MODEL_VERSION: ""
 
-# A lighter canary than prod (MLO-03): less traffic, a 5-minute analysis window, and autoPromote=true — there is
-# no indefinite `pause: {}` step, so the Rollout runs through to 100% by itself (16-mlops §6: uat/local). Prod
-# sets autoPromote=false with an explicit promotion gate; see envs/prod/ml/values.yaml.
-# Same note as in envs/prod/ml/values.yaml about the infrastructure-level canary (image change) versus the shadow/canary model (ML-24).
+# Canary for a new image OR a new model version (MLO-03; 16-mlops section 6): 10% -> 50% -> 100% with analysis, 5-minute
+# windows, autoPromote=true: there is no indefinite `pause: {}` step, so the Rollout runs through to 100% by itself.
+# Prod has longer windows and a manual gate before 100% (envs/prod/ml/values.yaml). With 1 replica the 10% step runs
+# one canary pod next to one stable pod (no traffic router: the share follows the pod count).
 rollout:
   enabled: true
   steps:
-    - setWeight: 20
-    - pause: { duration: 5m }   # background analysis window (count*interval); a failure aborts the Rollout
+    - setWeight: 10
+    - pause: { duration: 5m }   # background analysis (startingStep 1, count*interval); a failure aborts the Rollout
+    - setWeight: 50
+    - analysis:                 # blocking analysis at 50% with the same template and metrics
+        templates:
+          - templateName: ml     # fullnameOverride=ml, set by clusters/uat/services.yaml
+        args:
+          - name: canary-hash
+            valueFrom: { podTemplateHashValue: Latest }
+          - name: stable-hash
+            valueFrom: { podTemplateHashValue: Stable }
     - setWeight: 100            # autoPromote=true: no manual pause before 100%
   analysis:
     enabled: true
@@ -23,23 +38,82 @@ rollout:
     interval: 1m
     count: 5
     metrics:
+      # Any violation fails the AnalysisRun (failureLimit: 0, set in the chart) and Argo Rollouts aborts: traffic goes
+      # back to the stable pods, which still serve the old model version.
       - name: error-rate-vs-baseline
+        # canary error rate <= stable error rate + 0.5 percentage points; error rate = errors / (errors + successes)
         query: |
           (
-            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m]))
+            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[2m]))
             /
-            clamp_min(sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m])), 1)
+            clamp_min(sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[2m]))
+              + sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.canary-hash}}"}[2m])), 1e-9)
           )
           -
           (
-            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[1m]))
+            sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[2m]))
             /
-            clamp_min(sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.stable-hash}}"}[1m])), 1)
+            clamp_min(sum(rate(shp_ml_predict_errors_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[2m]))
+              + sum(rate(shp_ml_predict_seconds_count{rollouts_pod_template_hash="{{args.stable-hash}}"}[2m])), 1e-9)
           )
         successCondition: "result[0] <= 0.005"
       - name: predict-latency-p95
+        # p95 prediction latency of the canary <= 100 ms (M3, NFR)
         query: |
           histogram_quantile(0.95,
-            sum(rate(shp_ml_predict_seconds_bucket{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m])) by (le)
+            sum(rate(shp_ml_predict_seconds_bucket{rollouts_pod_template_hash="{{args.canary-hash}}"}[2m])) by (le)
           )
         successCondition: "result[0] <= 0.1"
+      - name: score-psi-vs-stable
+        # Score PSI of the canary's model against the stable model, on the same appointments: the stable pods shadow the
+        # candidate and export shp_ml_shadow_score_psi (ML-25). Selected for the version the canary serves
+        # (shp_ml_model_info of the canary pods). An image-only canary (same model version on both sides) returns 0.
+        # A model canary without that series yet returns nothing, which errors the measurement: no evidence, no promotion.
+        query: |
+          max(
+            shp_ml_shadow_score_psi{rollouts_pod_template_hash="{{args.stable-hash}}"}
+            * on(model_version) group_left()
+            max by (model_version) (shp_ml_model_info{role="production", rollouts_pod_template_hash="{{args.canary-hash}}"})
+          )
+          or
+          (vector(0) unless on() (
+            max by (model_version) (shp_ml_model_info{role="production", rollouts_pod_template_hash="{{args.canary-hash}}"})
+            unless on(model_version)
+            max by (model_version) (shp_ml_model_info{role="production", rollouts_pod_template_hash="{{args.stable-hash}}"})
+          ))
+        successCondition: "result[0] < 0.1"
+      - name: agreement-vs-stable
+        # highRisk agreement of the canary's model with the stable model on the same appointments >= 90% (shadow in the
+        # stable pods, shp_ml_shadow_agreement_total). Same selection and image-only rule as score-psi-vs-stable.
+        query: |
+          max(
+            (
+              sum by (model_version) (rate(shp_ml_shadow_agreement_total{agree="true", rollouts_pod_template_hash="{{args.stable-hash}}"}[10m]))
+              /
+              sum by (model_version) (rate(shp_ml_shadow_agreement_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[10m]))
+            )
+            * on(model_version) group_left()
+            max by (model_version) (shp_ml_model_info{role="production", rollouts_pod_template_hash="{{args.canary-hash}}"})
+          )
+          or
+          (vector(1) unless on() (
+            max by (model_version) (shp_ml_model_info{role="production", rollouts_pod_template_hash="{{args.canary-hash}}"})
+            unless on(model_version)
+            max by (model_version) (shp_ml_model_info{role="production", rollouts_pod_template_hash="{{args.stable-hash}}"})
+          ))
+        successCondition: "result[0] >= 0.9"
+      - name: high-risk-rate-stability
+        # the highRisk rate of the canary stays within ±5 percentage points of the stable pods
+        query: |
+          (
+            sum(rate(shp_ml_high_risk_total{high_risk="true", rollouts_pod_template_hash="{{args.canary-hash}}"}[10m]))
+            /
+            clamp_min(sum(rate(shp_ml_high_risk_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[10m])), 1e-9)
+          )
+          -
+          (
+            sum(rate(shp_ml_high_risk_total{high_risk="true", rollouts_pod_template_hash="{{args.stable-hash}}"}[10m]))
+            /
+            clamp_min(sum(rate(shp_ml_high_risk_total{rollouts_pod_template_hash="{{args.stable-hash}}"}[10m])), 1e-9)
+          )
+        successCondition: "result[0] >= -0.05 && result[0] <= 0.05"

@@ -1,0 +1,50 @@
+# Retraining job of the no-show model (ML-22 creates the requests, ML-23 is the code this job runs; 16-mlops §5).
+# Per-environment values: envs/<env>/addons/ml-retrain.yaml.
+#
+# How "exactly one run, never overlapping" is guaranteed, in three layers:
+#   1. concurrencyPolicy: Forbid - the CronJob never starts a pod while the previous one is still running;
+#   2. the MongoDB lock in shp_ml.retrain (`retrain_state`) - a second process that gets through anyway (manual Job,
+#      node recovery) finds the lock held and exits without touching the request;
+#   3. activeDeadlineSeconds is shorter than the lock lease (2 hours in shp_ml.retrain.LEASE), so a live job always
+#      holds a valid lock; a dead job releases it when the lease expires.
+namespace: shp-apps
+
+# Training image: the `train` and `mlflow` extras of services/ml (MLO-02). Not built by any pipeline yet, so while
+# image.digest is empty the chart renders nothing, the same way a service without a digest gets no Application.
+image:
+  repository: ""            # FILL IN: <acrLoginServer>/ml-train
+  digest: ""                # written by the training image pipeline (MLO-02); never edit by hand
+  tag: ""                   # local tests only
+  pullPolicy: IfNotPresent
+
+# The request is created by the daily monitor (02:00 Vietnam time); polling every 15 minutes bounds the delay and
+# costs one short pod per poll when nothing is pending.
+schedule: "*/15 * * * *"
+timeZone: Etc/UTC
+suspend: false
+startingDeadlineSeconds: 600
+activeDeadlineSeconds: 6600  # must stay below the 7200 s lock lease
+historyLimit: 3
+ttlSecondsAfterFinished: 604800
+
+# The ml service account carries the Workload Identity of the ml service (created by its Application), so the job
+# reads and writes the same MongoDB without a new identity.
+serviceAccountName: ml
+
+env:
+  MONGODB_DB: ml
+  MLFLOW_TRACKING_URI: http://mlflow.shp-deps:5000   # GOP-10
+# Existing Secret (created from Key Vault by ENV-01 / IAC-10) that holds the MongoDB URI. Never a value in this repo.
+mongodbSecret:
+  name: ml-mongodb          # FILL IN once IAC-10 defines the Secret the ml service reads
+  key: uri
+
+resources:
+  requests: { cpu: 500m, memory: 1Gi }
+  limits: { memory: 4Gi }
+datasetsSizeLimit: 2Gi      # Parquet snapshot of the 24-month window (emptyDir)
+
+networkPolicy:
+  mlflowNamespace: shp-deps
+  privateCidr: 10.0.0.0/8        # Cosmos DB for MongoDB and Blob private endpoints
+  entraEgressCidr: 0.0.0.0/0     # Microsoft Entra ID token endpoint (Workload Identity), 443 only

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mlflow
+description: MLflow tracking server and model registry for the cluster environments (GOP-10; ADR-0007, 16-mlops). PostgreSQL backend store, Blob artifacts, Workload Identity.
+type: application
+version: 0.1.0
+appVersion: "2.17.2"

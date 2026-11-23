@@ -25,6 +25,8 @@ flowchart LR
 | `platform/addons/<name>/values.yaml` | Add-on values; per-environment overrides live in `envs/<env>/addons/<name>.yaml` | SA |
 | `platform/charts/shp-keycloak/` | Keycloak (ADR-0017, IAM-01): namespace `shp-iam` (PSA restricted, default-deny NetworkPolicy), 2 replicas in prod, realm `shp` imported from `files/realm-shp.json`, `/idp` HTTPRoute + ReferenceGrant. Values: `envs/<env>/keycloak.yaml` | SA |
 | `platform/charts/shp-baseline/` | Namespace at PSA restricted, default-deny NetworkPolicy, 4 Kyverno policies (ACR only, cosign signature, no `:latest`, resources/probes required), Gateway + Let's Encrypt, and the `ClientTrafficPolicy` that gives Envoy the real client IP | SA |
+| `platform/charts/mlflow/`, `envs/<env>/addons/mlflow.yaml` | MLflow tracking + model registry in namespace `shp-deps` (GOP-10): PostgreSQL backend store, artifacts on the Blob `mlops` container, both through Workload Identity (no password or key); NetworkPolicy limits callers to `shp-apps` | SA |
+| `platform/charts/ml-retrain/`, `envs/<env>/addons/ml-retrain.yaml` | CronJob (`concurrencyPolicy: Forbid`, no retries) that runs `python -m shp_ml.retrain` in `shp-apps` (MLO-04); renders nothing until the training image digest is set | SA |
 | `envs/services-common.yaml`, `envs/<env>/services.yaml` | Values shared by every service (OTLP, OIDC, replica count) | SA |
 | `envs/<env>/<svc>/values.yaml` | Per-service values; **`image.digest` is written by the pipeline, never edited by hand** | pipeline / SA |
 | `tools/validate.sh`, `tools/identity/` | Local/CI validation; `apply-realm.sh` reconciles a running realm, `fetch-breached-password-list.sh` downloads the pinned password blacklist | SA |
@@ -42,6 +44,7 @@ flowchart LR
 Fill in the fields that are still empty. None of them is a secret; the values come from Terraform outputs and the Keycloak realm (ADR-0017; `OIDC_AUTHORITY` = `https://<gateway.hostname>/idp/realms/shp`, `OIDC_AUDIENCE` = `shp-api`):
 - `envs/<env>/platform.yaml`: `acrLoginServer`, `gateway.hostname`, `gateway.acmeEmail`.
 - `envs/<env>/services.yaml`: `OIDC_AUTHORITY`, `OIDC_AUDIENCE`.
+- `envs/<env>/addons/mlflow.yaml` (GOP-10): `image.repository` and `image.digest` (the MLflow image with the PostgreSQL and Azure drivers, recipe in `platform/charts/mlflow/values.yaml`), `workloadIdentity.clientId`, `database.host`, `database.user` (Entra principal of the mlflow identity), `artifacts.storageAccount`.
 - `envs/<env>/<svc>/values.yaml`: `image.repository` = `<acrLoginServer>/<svc>`.
 - `envs/<env>/keycloak.yaml` (IAM-01): `hostname` (= `gateway.hostname`), `database.host`, `workloadIdentity.clientId`, `keyVault.name`, `keyVault.tenantId`, `kubernetesClientAuth.issuer` (the AKS OIDC issuer URL); all but the last are in `terraform output keycloak_values` (IAC-16). The Key Vault secrets `keycloak-db-password` and `keycloak-admin-password` are created by Terraform and mounted by the Secrets Store CSI driver; they never appear here.
 - `envs/<env>/keycloak.yaml` before the realm serves real users: `passwordBlacklist.file` = the fetched curated list and `passwordBlacklist.requireCuratedList: true` (see [the realm runbook](docs/runbooks/keycloak-realm.md) §3); until then self-registration stays off.

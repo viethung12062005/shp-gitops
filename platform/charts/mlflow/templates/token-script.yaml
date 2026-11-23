@@ -1,0 +1,49 @@
+{{- if .Values.database.entraAuth.enabled }}
+# Writes a libpq passfile whose password is a short-lived Entra access token (Workload Identity). No static secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlflow-pgpass-refresh
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "mlflow.labels" . | nindent 4 }}
+data:
+  refresh.py: |
+    import os
+    import sys
+    import time
+
+    from azure.identity import DefaultAzureCredential
+
+    PATH = os.environ["PGPASSFILE"]
+    SCOPE = os.environ["PG_TOKEN_SCOPE"]
+    EVERY = int(os.environ["PG_REFRESH_SECONDS"])
+
+
+    def esc(value: str) -> str:
+        return value.replace("\\", "\\\\").replace(":", "\\:")
+
+
+    def write() -> None:
+        token = DefaultAzureCredential().get_token(SCOPE).token
+        line = ":".join(esc(os.environ[k]) for k in ("PGHOST", "PGPORT", "PGDATABASE", "PGUSER")) + ":" + esc(token)
+        tmp = PATH + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(line + "\n")
+        os.replace(tmp, PATH)  # atomic: a connecting libpq never reads a half-written file
+
+
+    if sys.argv[1:] == ["--once"]:
+        write()
+        print("token written", flush=True)
+        sys.exit(0)
+    while True:
+        try:
+            write()
+            print("token refreshed", flush=True)
+            wait = EVERY
+        except Exception as exc:  # noqa: BLE001 - keep the old token until the next try
+            print("token refresh failed:", type(exc).__name__, flush=True)
+            wait = 60
+        time.sleep(wait)
+{{- end }}
