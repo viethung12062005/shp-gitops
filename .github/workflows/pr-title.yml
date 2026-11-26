@@ -8,4 +8,4 @@ permissions:
   contents: read
 jobs:
   title:
-    uses: viethung12062005/shp-platform-templates/.github/workflows/pr-title.yml@v0.1.7
+    uses: viethung12062005/shp-platform-templates/.github/workflows/pr-title.yml@v0.1.8
